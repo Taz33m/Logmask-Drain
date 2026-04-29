@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.3.1 - 2026-04-29
+
+API LLM synthesis hardening release.
+
+### Added
+
+- `--provider-timeout-seconds` and `--provider-max-retries` for
+  `logmask synthesize --backend api-llm`.
+- Provider timeout/retry settings in generated bundle provenance and candidate
+  reports.
+- `logmask candidate-schema` for exporting the candidate-mask JSON schema.
+- Grouped `rejection_examples` in candidate reports for easier debugging.
+- Prompt snapshot and adversarial candidate tests.
+
+### Changed
+
+- Package version is now `0.3.1`.
+- Duplicate runtime-equivalent candidate detection now ignores priority, so
+  candidates cannot evade duplicate detection by only changing ordering weight.
+
+### Verified
+
+- `python -m pytest -q` passes with 37 tests and 1 skipped live API test.
+- `python -m build` produces sdist and wheel.
+- `twine check dist/logmask_drain-0.3.1*` passes.
+- Fresh wheel install without `api-llm` extra passes.
+- `logmask candidate-schema` works from a fresh wheel.
+- Rules backend remains network-free from a fresh wheel.
+- API backend without optional dependency fails cleanly with install guidance.
+
 ## v0.3.0 - 2026-04-29
 
 Optional API LLM candidate-mask synthesis behind a hard safety boundary.

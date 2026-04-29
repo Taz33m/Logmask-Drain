@@ -28,7 +28,7 @@ from .io import (
 from .mask_bundle import create_mask_bundle
 from .masking import Masker
 from .metrics import grouping_accuracy_exact, normalize_generic_template, parsing_accuracy_generic
-from .models import BundleValidationSummary, MaskBundle
+from .models import BundleValidationSummary, CandidateMaskBundle, MaskBundle
 from .performance import performance_benchmark
 from .pipeline import parse_lines
 from .regex_validation import VALIDATOR_VERSION, validate_masks as validate_mask_specs
@@ -143,6 +143,16 @@ def synthesize(
     max_candidates: int = typer.Option(32, "--max-candidates", help="Maximum LLM candidates to request/use."),
     temperature: float = typer.Option(0, "--temperature", help="API LLM generation temperature."),
     prompt_version: str = typer.Option(API_LLM_MASKS_PROMPT_VERSION, "--prompt-version"),
+    provider_timeout_seconds: float = typer.Option(
+        60,
+        "--provider-timeout-seconds",
+        help="Per API request timeout for --backend api-llm.",
+    ),
+    provider_max_retries: int = typer.Option(
+        0,
+        "--provider-max-retries",
+        help="Provider request retry count for --backend api-llm.",
+    ),
     out: Path = typer.Option(..., "--out", help="Output mask bundle JSON."),
     strict: bool = typer.Option(True, "--strict/--no-strict", help="Reject unsafe/useless masks."),
     include_raw_examples: bool = typer.Option(
@@ -166,6 +176,10 @@ def synthesize(
     elif backend == "api-llm":
         if max_candidates <= 0:
             raise typer.BadParameter("--max-candidates must be positive")
+        if provider_timeout_seconds <= 0:
+            raise typer.BadParameter("--provider-timeout-seconds must be positive")
+        if provider_max_retries < 0:
+            raise typer.BadParameter("--provider-max-retries must be zero or positive")
         try:
             api_provider = get_api_provider(provider)
             bundle, report = synthesize_api_llm_bundle(
@@ -175,6 +189,8 @@ def synthesize(
                 prompt_version=prompt_version,
                 temperature=temperature,
                 max_candidates=max_candidates,
+                provider_timeout_seconds=provider_timeout_seconds,
+                provider_max_retries=provider_max_retries,
                 base_rules=base_rules,
                 strict=strict,
                 include_raw_examples=include_raw_examples,
@@ -498,6 +514,14 @@ def hash_bundle(masks: Path = typer.Argument(...)) -> None:
             }
         )
     )
+
+
+@app.command("candidate-schema")
+def candidate_schema(out: Optional[Path] = typer.Option(None, "--out", help="Optional JSON schema output path.")) -> None:
+    schema = CandidateMaskBundle.model_json_schema()
+    if out is not None:
+        save_json(out, schema)
+    console.print_json(json.dumps(schema))
 
 
 if __name__ == "__main__":

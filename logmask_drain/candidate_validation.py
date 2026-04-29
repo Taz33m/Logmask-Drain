@@ -62,7 +62,6 @@ def _runtime_signature(mask: MaskSpec) -> tuple[Any, ...]:
         tuple(sorted(mask.flags)),
         mask.value_group,
         mask.replacement,
-        mask.priority,
     )
 
 
@@ -190,6 +189,7 @@ def validate_candidate_masks(
     rejected: list[RejectedMask] = []
     reason_counts: Counter[str] = Counter()
     report_candidates: list[dict[str, Any]] = []
+    rejection_examples: dict[str, list[dict[str, Any]]] = {}
     seen_names = {mask.name for mask in base_masks or []}
     seen_signatures = {_runtime_signature(mask) for mask in base_masks or []}
     previous_masks = list(base_masks or [])
@@ -237,6 +237,15 @@ def validate_candidate_masks(
             reason_counts[reason] += 1
             candidate_report["status"] = "rejected"
             candidate_report["reason"] = reason
+            rejection_examples.setdefault(reason, [])
+            if len(rejection_examples[reason]) < 5:
+                rejection_examples[reason].append(
+                    {
+                        "name": candidate.name,
+                        "type": candidate.type,
+                        "pattern": candidate.pattern,
+                    }
+                )
 
         report_candidates.append(candidate_report)
 
@@ -249,6 +258,7 @@ def validate_candidate_masks(
     report = {
         "candidate_schema_version": "0.1",
         "candidate_validation": model_to_data(summary),
+        "rejection_examples": rejection_examples,
         "candidates": report_candidates,
     }
     return CandidateValidationResult(accepted=accepted, rejected=rejected, summary=summary, report=report)

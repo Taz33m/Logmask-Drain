@@ -21,10 +21,11 @@ logmask perf-benchmark --lines 10000 --lines 100000
 
 No GPU, model download, API key, or network access is required.
 
-## What v0.3 Includes
+## What v0.3.x Includes
 
 - Rule-based conservative and aggressive mask synthesis.
 - Optional API LLM candidate-mask synthesis behind strict local validation.
+- API LLM candidate reports, schema export, provider timeout, and retry knobs.
 - Strict regex validation with timeout, empty-match, over-broadness, and
   catastrophic-pattern checks.
 - Context-preserving `value_group` replacement.
@@ -63,8 +64,16 @@ logmask synthesize sample.txt \
   --backend api-llm \
   --provider openai \
   --model gpt-4.1-mini \
+  --provider-timeout-seconds 60 \
+  --provider-max-retries 1 \
   --candidate-report candidates.json \
   --out masks.llm.json
+```
+
+Export the candidate-mask schema used for API LLM structured outputs:
+
+```bash
+logmask candidate-schema --out candidate-schema.json
 ```
 
 Hybrid mode is explicit:

@@ -31,6 +31,8 @@ class CandidateProvider(Protocol):
         prompt_version: str,
         temperature: float,
         max_candidates: int,
+        timeout_seconds: float,
+        max_retries: int,
     ) -> CandidateMaskBundle:
         """Return parsed candidate masks. Providers must not return runtime bundles."""
 
@@ -58,18 +60,29 @@ class OpenAIProvider:
         prompt_version: str,
         temperature: float,
         max_candidates: int,
+        timeout_seconds: float,
+        max_retries: int,
     ) -> CandidateMaskBundle:
         if prompt_version != API_LLM_MASKS_PROMPT_VERSION:
             raise ValueError(f"unsupported prompt_version: {prompt_version}")
-        response = self.client.responses.parse(
-            model=model,
-            input=[
-                {"role": "system", "content": api_llm_masks_system_prompt(max_candidates=max_candidates)},
-                {"role": "user", "content": api_llm_masks_user_prompt(sample_lines)},
-            ],
-            temperature=temperature,
-            text_format=CandidateMaskBundle,
-        )
+        last_error: Exception | None = None
+        for _attempt in range(max_retries + 1):
+            try:
+                response = self.client.responses.parse(
+                    model=model,
+                    input=[
+                        {"role": "system", "content": api_llm_masks_system_prompt(max_candidates=max_candidates)},
+                        {"role": "user", "content": api_llm_masks_user_prompt(sample_lines)},
+                    ],
+                    temperature=temperature,
+                    text_format=CandidateMaskBundle,
+                    timeout=timeout_seconds,
+                )
+                break
+            except Exception as exc:  # pragma: no cover - SDK-specific exception hierarchy.
+                last_error = exc
+        else:
+            raise RuntimeError(f"OpenAI candidate-mask synthesis failed: {last_error}") from last_error
         for output in response.output:
             if output.type != "message":
                 continue
@@ -104,6 +117,8 @@ def synthesize_api_llm_bundle(
     prompt_version: str = API_LLM_MASKS_PROMPT_VERSION,
     temperature: float = 0,
     max_candidates: int = 32,
+    provider_timeout_seconds: float = 60,
+    provider_max_retries: int = 0,
     base_rules: str = "none",
     strict: bool = True,
     include_raw_examples: bool = False,
@@ -122,6 +137,8 @@ def synthesize_api_llm_bundle(
         prompt_version=prompt_version,
         temperature=temperature,
         max_candidates=max_candidates,
+        timeout_seconds=provider_timeout_seconds,
+        max_retries=provider_max_retries,
     )
     candidates = candidate_bundle.candidates[:max_candidates]
     candidate_result = validate_candidate_masks(
@@ -151,6 +168,8 @@ def synthesize_api_llm_bundle(
             params={
                 "base_rules": base_rules,
                 "max_candidates": max_candidates,
+                "provider_timeout_seconds": provider_timeout_seconds,
+                "provider_max_retries": provider_max_retries,
                 "schema_version": candidate_bundle.candidate_schema_version,
                 "allow_new_types": allow_new_types,
             },
@@ -172,6 +191,8 @@ def synthesize_api_llm_bundle(
         "model": model,
         "prompt_version": prompt_version,
         "base_rules": base_rules,
+        "provider_timeout_seconds": provider_timeout_seconds,
+        "provider_max_retries": provider_max_retries,
         "base_rule_accept_count": len(base_accepted),
         "base_rule_reject_count": len(base_rejected),
         "accepted_runtime_mask_count": len(accepted),
@@ -179,4 +200,3 @@ def synthesize_api_llm_bundle(
         "candidate_validation": model_to_data(candidate_result.summary),
     }
     return bundle, report
-
