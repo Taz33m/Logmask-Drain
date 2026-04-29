@@ -1,0 +1,5 @@
+LineId,Content,EventId,EventTemplate
+2,2024-01-15 10:30:46 INFO request_id=req-002 User bob logged in from IP 10.0.0.2,E1,<*> INFO request_id=<*> User <*> logged in from IP <*>
+1,2024-01-15 10:30:45 INFO request_id=req-001 User alice logged in from IP 10.0.0.1,E1,<*> INFO request_id=<*> User <*> logged in from IP <*>
+4,2024-01-15 10:31:01 WARN pid=456 port=443 connection failed after 15ms,E2,<*> WARN pid=<*> port=<*> connection failed after <*>
+3,2024-01-15 10:31:00 WARN pid=123 port=443 connection failed after 10ms,E2,<*> WARN pid=<*> port=<*> connection failed after <*>

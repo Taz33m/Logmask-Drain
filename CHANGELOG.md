@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.4.0 - 2026-04-29
+
+LogHub-compatible evaluation harness.
+
+### Added
+
+- `logmask benchmark-loghub` for LogHub-style structured CSV files with
+  `Content`, `EventTemplate`, and optional `EventId` columns.
+- LogHub structured CSV loader with explicit label provenance in JSON output.
+- LogHub-compatible fixture and CLI tests.
+- `docs/LOGHUB_BENCHMARKS.md` with label-source and public-comparison caveats.
+- CI fresh-wheel smoke coverage for `candidate-schema` and
+  `benchmark-loghub`.
+
+### Changed
+
+- Package version is now `0.4.0`.
+
+### Verified
+
+- `python -m pytest -q` passes with 40 tests and 1 skipped live API test.
+- `python -m build` produces sdist and wheel.
+- `twine check dist/logmask_drain-0.4.0*` passes.
+- Fresh wheel install passes the CLI smoke checklist.
+- `logmask benchmark-loghub` works from a fresh wheel with explicit label
+  provenance.
+
 ## v0.3.1 - 2026-04-29
 
 API LLM synthesis hardening release.

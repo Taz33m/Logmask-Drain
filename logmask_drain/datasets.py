@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -20,3 +21,74 @@ def load_ground_truth_templates(path: str | Path) -> list[str]:
             rows.sort(key=lambda row: int(row["line_id"]))
         return [row[template_field] for row in rows]
 
+
+@dataclass(frozen=True)
+class LogHubStructuredDataset:
+    logs: list[str]
+    templates: list[str]
+    clusters: list[str]
+    content_column: str
+    template_column: str
+    cluster_column: str | None
+    label_source: str
+
+
+def _first_present(fieldnames: list[str], candidates: list[str]) -> str | None:
+    exact = set(fieldnames)
+    for candidate in candidates:
+        if candidate in exact:
+            return candidate
+    lowered = {name.lower(): name for name in fieldnames}
+    for candidate in candidates:
+        found = lowered.get(candidate.lower())
+        if found is not None:
+            return found
+    return None
+
+
+def _sort_structured_rows(rows: list[dict[str, str]], fieldnames: list[str]) -> list[dict[str, str]]:
+    line_id_column = _first_present(fieldnames, ["LineId", "line_id", "lineid"])
+    if line_id_column is None:
+        return rows
+    try:
+        return sorted(rows, key=lambda row: int(row[line_id_column]))
+    except (TypeError, ValueError):
+        return rows
+
+
+def load_loghub_structured_csv(
+    path: str | Path,
+    *,
+    label_source: str = "structured_csv",
+) -> LogHubStructuredDataset:
+    """Load a LogHub-style *_structured.csv file with explicit label provenance."""
+
+    with Path(path).open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if reader.fieldnames is None:
+            raise ValueError("LogHub structured CSV has no header")
+        fieldnames = list(reader.fieldnames)
+        content_column = _first_present(fieldnames, ["Content", "content", "Message", "message"])
+        template_column = _first_present(
+            fieldnames,
+            ["EventTemplate", "event_template", "template", "Template"],
+        )
+        cluster_column = _first_present(fieldnames, ["EventId", "event_id", "eventid", "cluster", "Cluster"])
+        if content_column is None:
+            raise ValueError("LogHub structured CSV must contain a Content column")
+        if template_column is None:
+            raise ValueError("LogHub structured CSV must contain an EventTemplate column")
+
+        rows = _sort_structured_rows(list(reader), fieldnames)
+        logs = [row[content_column] for row in rows]
+        templates = [row[template_column] for row in rows]
+        clusters = [row[cluster_column] for row in rows] if cluster_column is not None else templates
+        return LogHubStructuredDataset(
+            logs=logs,
+            templates=templates,
+            clusters=clusters,
+            content_column=content_column,
+            template_column=template_column,
+            cluster_column=cluster_column,
+            label_source=label_source,
+        )

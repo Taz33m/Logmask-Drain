@@ -11,7 +11,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from .datasets import load_ground_truth_templates
+from .datasets import load_ground_truth_templates, load_loghub_structured_csv
 from .drain_adapter import get_parser
 from .io import (
     bundle_sha256,
@@ -418,6 +418,86 @@ def benchmark(
             str(item["singleton_count"]),
         )
     console.print(table)
+
+
+@app.command("benchmark-loghub")
+def benchmark_loghub(
+    structured: Path = typer.Option(..., "--structured", help="LogHub-style *_structured.csv with Content/EventTemplate."),
+    methods: str = typer.Option("drain,builtin,bundle", "--methods"),
+    masks: Optional[Path] = typer.Option(None, "--masks"),
+    rule_mode: str = typer.Option("conservative", "--rule-mode"),
+    similarity_threshold: float = typer.Option(0.4, "--similarity-threshold"),
+    label_source: str = typer.Option("structured_csv", "--label-source", help="Human-readable label provenance."),
+    out: Optional[Path] = typer.Option(None, "--out"),
+) -> None:
+    try:
+        dataset = load_loghub_structured_csv(structured, label_source=label_source)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    truth_generic = [normalize_generic_template(item) for item in dataset.templates]
+    truth_clusters = dataset.clusters if dataset.cluster_column is not None else truth_generic
+    results = []
+    for method in _parse_methods(methods):
+        predicted_templates, predicted_clusters, elapsed = _templates_for_method(
+            method,
+            dataset.logs,
+            masks_path=masks,
+            rule_mode=rule_mode,
+            similarity_threshold=similarity_threshold,
+        )
+        predicted_generic = [normalize_generic_template(item) for item in predicted_templates]
+        results.append(
+            {
+                "method": method,
+                "GA_exact": grouping_accuracy_exact(predicted_generic, truth_clusters),
+                "PA_generic": parsing_accuracy_generic(predicted_templates, dataset.templates),
+                "runtime_seconds": elapsed,
+                "runtime_per_100_logs_seconds": elapsed / max(len(dataset.logs), 1) * 100,
+                "template_count": len(set(predicted_clusters)),
+                "singleton_count": sum(1 for key in set(predicted_clusters) if predicted_clusters.count(key) == 1),
+            }
+        )
+
+    payload = {
+        "dataset": {
+            "format": "loghub_structured_csv",
+            "path": str(structured),
+            "line_count": len(dataset.logs),
+            "label_source": dataset.label_source,
+            "content_column": dataset.content_column,
+            "template_column": dataset.template_column,
+            "cluster_column": dataset.cluster_column,
+        },
+        "results": results,
+    }
+    if out is not None:
+        save_json(out, payload)
+
+    table = Table(title="LogHub-Compatible Benchmark")
+    for column in [
+        "method",
+        "GA_exact",
+        "PA_generic",
+        "runtime_per_100_logs_seconds",
+        "template_count",
+        "singleton_count",
+    ]:
+        table.add_column(column)
+    for item in results:
+        table.add_row(
+            item["method"],
+            f"{item['GA_exact']:.6f}",
+            f"{item['PA_generic']:.6f}",
+            f"{item['runtime_per_100_logs_seconds']:.6f}",
+            str(item["template_count"]),
+            str(item["singleton_count"]),
+        )
+    console.print(table)
+    console.print(
+        f"Labels: {dataset.label_source}; content={dataset.content_column}; "
+        f"template={dataset.template_column}; cluster={dataset.cluster_column or dataset.template_column}"
+    )
 
 
 @app.command("perf-benchmark")

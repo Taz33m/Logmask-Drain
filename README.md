@@ -44,6 +44,8 @@ No GPU, model download, API key, or network access is required.
   unmasked high-cardinality tokens, and deterministic recommendations.
 - Synthetic performance benchmarks for `synthesize`, `mask`, `parse`, and
   `report`.
+- LogHub-compatible structured CSV benchmark harness with explicit label
+  provenance.
 
 ## Optional API LLM Synthesis
 
@@ -110,9 +112,28 @@ Run deterministic synthetic throughput checks with:
 logmask perf-benchmark --lines 10000 --lines 100000 --out perf.json
 ```
 
+## LogHub-Compatible Benchmarks
+
+Use structured CSV files with explicit label provenance:
+
+```bash
+logmask benchmark-loghub \
+  --structured HDFS_2k.log_structured.csv \
+  --methods drain,builtin,bundle \
+  --masks masks.json \
+  --label-source "LogHub structured CSV EventTemplate/EventId" \
+  --out loghub-results.json
+```
+
+Logmask-Drain does not bundle LogHub datasets or make LogHub-scale accuracy
+claims. See [docs/LOGHUB_BENCHMARKS.md](docs/LOGHUB_BENCHMARKS.md) for the
+benchmark contract and reporting caveats.
+
 See [docs/PRD.md](docs/PRD.md) for the product direction and
 [docs/REVIEW.md](docs/REVIEW.md) for the current engineering review. For
-operational mask tuning, see [docs/MASK_TUNING.md](docs/MASK_TUNING.md).
+operational mask tuning, see [docs/MASK_TUNING.md](docs/MASK_TUNING.md). For
+LogHub-compatible evaluation, see
+[docs/LOGHUB_BENCHMARKS.md](docs/LOGHUB_BENCHMARKS.md).
 
 ## Template IDs
 

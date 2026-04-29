@@ -50,3 +50,5 @@ jobs:
           /tmp/logmask-wheel-test/bin/logmask parse tests/fixtures/toy/logs.txt --masks /tmp/masks.json --template-id-mode hash --out /tmp/parsed.jsonl
           /tmp/logmask-wheel-test/bin/logmask report /tmp/parsed.jsonl
           /tmp/logmask-wheel-test/bin/logmask benchmark --logs tests/fixtures/toy/logs.txt --ground-truth tests/fixtures/toy/templates.csv --methods drain,builtin,bundle --masks /tmp/masks.json
+          /tmp/logmask-wheel-test/bin/logmask candidate-schema --out /tmp/candidate-schema.json
+          /tmp/logmask-wheel-test/bin/logmask benchmark-loghub --structured tests/fixtures/loghub/structured.csv --methods drain,builtin,bundle --masks /tmp/masks.json --label-source "fixture labels" --out /tmp/loghub-benchmark.json
