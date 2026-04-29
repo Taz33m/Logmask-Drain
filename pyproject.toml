@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "logmask-drain"
+version = "0.1.1"
+description = "CPU-first mask-bundle log parser with deterministic Drain-style template extraction"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+  { name = "Logmask-Drain Contributors" }
+]
+dependencies = [
+  "pydantic>=2.0",
+  "regex>=2023.0.0",
+  "rich>=13.0.0",
+  "typer>=0.9.0"
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+drain3 = ["drain3>=0.9"]
+re2 = ["google-re2>=1.0"]
+yaml = ["pyyaml>=6.0"]
+
+[project.scripts]
+logmask = "logmask_drain.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["logmask_drain*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

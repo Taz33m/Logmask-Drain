@@ -1,0 +1,4 @@
+2024-01-15 10:30:45 INFO request_id=abc-123 User alice logged in from IP 192.168.1.100
+2024-01-15 10:31:02 INFO request_id=def-456 User bob logged in from IP 192.168.1.101
+2024-01-15 10:32:00 WARN pid=1234 port=443 connection failed after 20ms
+2024-01-15 10:32:05 WARN pid=5678 port=443 connection failed after 35ms
