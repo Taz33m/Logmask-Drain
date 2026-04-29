@@ -8,7 +8,7 @@ checkpoint, LogHub-scale benchmark, or LogBERT downstream case study. The goal
 is a local, reproducible parser boundary: fixed masks in, deterministic
 templates out.
 
-The v0.2 path is intentionally local and lightweight:
+The default path is intentionally local and lightweight:
 
 ```bash
 logmask synthesize sample.txt --backend rules --rule-mode conservative --out masks.json
@@ -21,9 +21,10 @@ logmask perf-benchmark --lines 10000 --lines 100000
 
 No GPU, model download, API key, or network access is required.
 
-## What v0.2 Includes
+## What v0.3 Includes
 
 - Rule-based conservative and aggressive mask synthesis.
+- Optional API LLM candidate-mask synthesis behind strict local validation.
 - Strict regex validation with timeout, empty-match, over-broadness, and
   catastrophic-pattern checks.
 - Context-preserving `value_group` replacement.
@@ -42,6 +43,42 @@ No GPU, model download, API key, or network access is required.
   unmasked high-cardinality tokens, and deterministic recommendations.
 - Synthetic performance benchmarks for `synthesize`, `mask`, `parse`, and
   `report`.
+
+## Optional API LLM Synthesis
+
+API LLM synthesis is opt-in. The LLM proposes candidate masks only; candidates
+must pass the same local safety gate before they can enter a saved runtime
+bundle.
+
+Install the optional dependency when using the API backend:
+
+```bash
+pip install "logmask-drain[api-llm]"
+```
+
+Generate LLM candidates:
+
+```bash
+logmask synthesize sample.txt \
+  --backend api-llm \
+  --provider openai \
+  --model gpt-4.1-mini \
+  --candidate-report candidates.json \
+  --out masks.llm.json
+```
+
+Hybrid mode is explicit:
+
+```bash
+logmask synthesize sample.txt \
+  --backend api-llm \
+  --provider openai \
+  --model gpt-4.1-mini \
+  --base-rules conservative \
+  --out masks.hybrid.json
+```
+
+The default `rules` backend remains network-free.
 
 ## Toy Benchmark
 

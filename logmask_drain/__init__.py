@@ -1,3 +1,3 @@
 """CPU-first mask-bundle log parser."""
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

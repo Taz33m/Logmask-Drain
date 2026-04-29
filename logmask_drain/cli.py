@@ -34,6 +34,8 @@ from .pipeline import parse_lines
 from .regex_validation import VALIDATOR_VERSION, validate_masks as validate_mask_specs
 from .reporting import drift_report, summarize_parsed
 from .sampling import sample_lines
+from .prompts import API_LLM_MASKS_PROMPT_VERSION
+from .synthesis_backends.api_llm import get_api_provider, synthesize_api_llm_bundle
 from .synthesis_backends.rules import get_rule_masks
 
 
@@ -119,8 +121,28 @@ def _print_summary(summary: dict) -> None:
 @app.command()
 def synthesize(
     sample: Path = typer.Argument(..., help="Plain-text sample log file."),
-    backend: str = typer.Option("rules", "--backend", help="Only 'rules' is supported in v0.2."),
+    backend: str = typer.Option("rules", "--backend", help="rules or api-llm."),
     rule_mode: str = typer.Option("conservative", "--rule-mode", help="conservative or aggressive."),
+    provider: str = typer.Option("openai", "--provider", help="API LLM provider for --backend api-llm."),
+    model: str = typer.Option("gpt-4.1-mini", "--model", help="API LLM model for --backend api-llm."),
+    base_rules: str = typer.Option(
+        "none",
+        "--base-rules",
+        help="none, conservative, or aggressive base masks for --backend api-llm.",
+    ),
+    candidate_report: Optional[Path] = typer.Option(
+        None,
+        "--candidate-report",
+        help="Optional JSON report of accepted/rejected LLM candidates.",
+    ),
+    allow_new_types: bool = typer.Option(
+        False,
+        "--allow-new-types",
+        help="Allow LLM candidates to introduce mask types outside the known registry.",
+    ),
+    max_candidates: int = typer.Option(32, "--max-candidates", help="Maximum LLM candidates to request/use."),
+    temperature: float = typer.Option(0, "--temperature", help="API LLM generation temperature."),
+    prompt_version: str = typer.Option(API_LLM_MASKS_PROMPT_VERSION, "--prompt-version"),
     out: Path = typer.Option(..., "--out", help="Output mask bundle JSON."),
     strict: bool = typer.Option(True, "--strict/--no-strict", help="Reject unsafe/useless masks."),
     include_raw_examples: bool = typer.Option(
@@ -129,19 +151,41 @@ def synthesize(
         help="Store raw validation examples instead of redacted examples.",
     ),
 ) -> None:
-    if backend != "rules":
-        raise typer.BadParameter("v0.2 supports only --backend rules")
     lines = read_lines(sample)
-    masks = get_rule_masks(rule_mode)
-    bundle = create_mask_bundle(
-        masks,
-        lines,
-        backend="rules",
-        sampler="manual",
-        rule_mode=rule_mode,
-        strict=strict,
-        include_raw_examples=include_raw_examples,
-    )
+    if backend == "rules":
+        masks = get_rule_masks(rule_mode)
+        bundle = create_mask_bundle(
+            masks,
+            lines,
+            backend="rules",
+            sampler="manual",
+            rule_mode=rule_mode,
+            strict=strict,
+            include_raw_examples=include_raw_examples,
+        )
+    elif backend == "api-llm":
+        if max_candidates <= 0:
+            raise typer.BadParameter("--max-candidates must be positive")
+        try:
+            api_provider = get_api_provider(provider)
+            bundle, report = synthesize_api_llm_bundle(
+                lines,
+                provider=api_provider,
+                model=model,
+                prompt_version=prompt_version,
+                temperature=temperature,
+                max_candidates=max_candidates,
+                base_rules=base_rules,
+                strict=strict,
+                include_raw_examples=include_raw_examples,
+                allow_new_types=allow_new_types,
+            )
+        except (RuntimeError, ValueError) as exc:
+            raise typer.BadParameter(str(exc)) from exc
+        if candidate_report is not None:
+            save_json(candidate_report, report)
+    else:
+        raise typer.BadParameter("--backend must be rules or api-llm")
     save_mask_bundle(out, bundle)
     console.print(
         f"Wrote {out} with {len(bundle.masks)} accepted mask(s), "

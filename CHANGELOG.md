@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.3.0 (unreleased)
+
+Optional API LLM candidate-mask synthesis behind a hard safety boundary.
+
+### Added
+
+- Optional `api-llm` synthesis backend with OpenAI provider support.
+- Candidate-mask schema, provider abstraction, and `api_llm_masks_v1` prompt.
+- LLM candidate validation gate with known-type, placeholder, log-level,
+  duplicate, over-broad, full-line, static-key, timeout, and regex safety
+  checks.
+- `--candidate-report`, `--base-rules`, `--allow-new-types`,
+  `--max-candidates`, `--temperature`, and `--prompt-version` for
+  `logmask synthesize --backend api-llm`.
+- Top-level `candidate_validation` provenance in API-generated mask bundles.
+- Optional `api-llm` package extra for OpenAI SDK installation.
+- Mocked API LLM tests and opt-in live API smoke test hook.
+
+### Changed
+
+- Package version is now `0.3.0`.
+- Rules remain the default synthesis backend and still require no network.
+
 ## v0.2.0 - 2026-04-29
 
 Real-log validation and performance hardening.

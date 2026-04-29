@@ -23,17 +23,21 @@ auditable, no-GPU environments.
 ## Current Product State
 
 - `v0.1.1` is released and tagged.
-- `v0.2.0` is the current release line.
+- `v0.2.0` is released and tagged.
+- `main` is now on the `0.3.0` development line.
 - The parser supports rule-based masks, strict validation, span-preserving
   masking, `simple_drain`, stable template hashes, hash-derived template IDs,
   reporting, drift, diffing, benchmarking, and synthetic performance checks.
+- v0.3 adds optional API LLM candidate-mask synthesis while keeping LLM output
+  untrusted until local validation accepts it.
 - CI runs on Python 3.11, 3.12, and 3.13.
 
-## Goals for v0.2
+## Goals for v0.3
 
-- Prove the parser on more realistic log shapes without adding LLM synthesis.
-- Make performance visible through deterministic synthetic benchmarks.
-- Improve report usefulness for tuning masks and spotting drift.
+- Add optional API LLM mask candidate generation.
+- Preserve deterministic parsing once a mask bundle is saved.
+- Keep rules as the default network-free path.
+- Record provider, model, prompt, and candidate validation provenance.
 - Keep all behavior local, CPU-only, and reproducible.
 
 ## Requirements
@@ -48,6 +52,8 @@ auditable, no-GPU environments.
   into next tuning actions.
 - Conservative rules must not mask broad numbers, generic IDs, or log levels by
   default.
+- LLM-generated masks must never bypass strict local validation.
+- API synthesis must be opt-in and must not affect the default rules backend.
 - CI must run tests, build artifacts, validate metadata, and run a fresh-wheel
   CLI smoke test.
 - Performance checks must report lines/sec and runtime per 100 logs for
@@ -55,9 +61,10 @@ auditable, no-GPU environments.
 
 ## Non-Goals
 
-- No API LLM synthesis in v0.2.
-- No local llama.cpp or Transformers backend in v0.2.
-- No LogBERT reproduction in v0.2.
+- No `drain3` integration in v0.3.
+- No LogHub-compatible evaluation in v0.3.
+- No local llama.cpp or Transformers backend in v0.3.
+- No LogBERT reproduction in v0.3.
 - No PyPI publishing unless requested separately.
 
 ## Success Metrics
@@ -68,6 +75,8 @@ auditable, no-GPU environments.
 - A v0.2 release checklist records test, build, wheel-smoke, and throughput
   verification commands.
 - Report JSON contains additive fields needed for mask tuning.
+- API LLM tests use mocked providers and require no network by default.
+- Live API tests are opt-in with `LOGMASK_RUN_LIVE_LLM_TESTS=1`.
 - No regression in toy benchmark behavior: raw Drain may group correctly while
   mask-first methods recover exact generic templates.
 
@@ -82,9 +91,9 @@ auditable, no-GPU environments.
 
 ### v0.3
 
-- Add optional API LLM candidate-mask synthesis.
-- Keep LLM output as untrusted candidate JSON.
-- Require validator acceptance before runtime use.
+- Add optional API LLM candidate-mask synthesis. In progress.
+- Keep LLM output as untrusted candidate JSON. In progress.
+- Require validator acceptance before runtime use. In progress.
 
 ### Later
 
