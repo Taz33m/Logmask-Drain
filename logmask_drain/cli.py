@@ -29,6 +29,7 @@ from .mask_bundle import create_mask_bundle
 from .masking import Masker
 from .metrics import grouping_accuracy_exact, normalize_generic_template, parsing_accuracy_generic
 from .models import BundleValidationSummary, MaskBundle
+from .performance import performance_benchmark
 from .pipeline import parse_lines
 from .regex_validation import VALIDATOR_VERSION, validate_masks as validate_mask_specs
 from .reporting import drift_report, summarize_parsed
@@ -75,6 +76,14 @@ def _print_summary(summary: dict) -> None:
         vars_table.add_row(key, str(value))
     console.print(vars_table)
 
+    coverage_table = Table(title="Mask Coverage by Type")
+    coverage_table.add_column("Type")
+    coverage_table.add_column("Count", justify="right")
+    coverage_table.add_column("Coverage", justify="right")
+    for key, value in summary["mask_coverage_by_type"].items():
+        coverage_table.add_row(key, str(value["count"]), f"{value['coverage']:.6f}")
+    console.print(coverage_table)
+
     top_table = Table(title="Top Templates")
     top_table.add_column("Count", justify="right")
     top_table.add_column("Hash")
@@ -83,11 +92,26 @@ def _print_summary(summary: dict) -> None:
         top_table.add_row(str(item["count"]), item["template_hash"], item["template"])
     console.print(top_table)
 
+    singleton_table = Table(title="Singleton Template Examples")
+    singleton_table.add_column("Line", justify="right")
+    singleton_table.add_column("Hash")
+    singleton_table.add_column("Template")
+    for item in summary["singleton_template_examples"]:
+        singleton_table.add_row(str(item["line_id"]), item["template_hash"], item["template"])
+    console.print(singleton_table)
+
+    token_table = Table(title="Top Unmasked High-Cardinality Tokens")
+    token_table.add_column("Token")
+    token_table.add_column("Count", justify="right")
+    for item in summary["top_unmasked_high_cardinality_tokens"]:
+        token_table.add_row(item["token"], str(item["count"]))
+    console.print(token_table)
+
 
 @app.command()
 def synthesize(
     sample: Path = typer.Argument(..., help="Plain-text sample log file."),
-    backend: str = typer.Option("rules", "--backend", help="Only 'rules' is supported in v0.1."),
+    backend: str = typer.Option("rules", "--backend", help="Only 'rules' is supported in v0.2."),
     rule_mode: str = typer.Option("conservative", "--rule-mode", help="conservative or aggressive."),
     out: Path = typer.Option(..., "--out", help="Output mask bundle JSON."),
     strict: bool = typer.Option(True, "--strict/--no-strict", help="Reject unsafe/useless masks."),
@@ -98,7 +122,7 @@ def synthesize(
     ),
 ) -> None:
     if backend != "rules":
-        raise typer.BadParameter("v0.1 supports only --backend rules")
+        raise typer.BadParameter("v0.2 supports only --backend rules")
     lines = read_lines(sample)
     masks = get_rule_masks(rule_mode)
     bundle = create_mask_bundle(
@@ -325,6 +349,39 @@ def benchmark(
             str(item["template_count"]),
             str(item["singleton_count"]),
         )
+    console.print(table)
+
+
+@app.command("perf-benchmark")
+def perf_benchmark(
+    lines: list[int] = typer.Option(
+        [10_000],
+        "--lines",
+        help="Synthetic line count. Repeat for multiple counts, e.g. --lines 10000 --lines 100000.",
+    ),
+    rule_mode: str = typer.Option("conservative", "--rule-mode"),
+    out: Optional[Path] = typer.Option(None, "--out"),
+) -> None:
+    results = [performance_benchmark(count, rule_mode=rule_mode) for count in lines]
+    payload = {"results": results}
+    if out is not None:
+        save_json(out, payload)
+
+    table = Table(title="Performance Benchmark")
+    table.add_column("Lines", justify="right")
+    table.add_column("Stage")
+    table.add_column("Seconds", justify="right")
+    table.add_column("Lines/Sec", justify="right")
+    table.add_column("Sec/100 Logs", justify="right")
+    for result in results:
+        for stage, values in result["stages"].items():
+            table.add_row(
+                str(result["line_count"]),
+                stage,
+                f"{values['seconds']:.6f}",
+                f"{values['lines_per_second']:.2f}",
+                f"{values['runtime_per_100_logs_seconds']:.6f}",
+            )
     console.print(table)
 
 

@@ -19,14 +19,24 @@ def _entropy(counter: Counter[str]) -> float:
 def summarize_parsed(lines: list[ParsedLine]) -> dict[str, Any]:
     template_counts = Counter(line.template_hash for line in lines)
     template_text = {line.template_hash: line.template for line in lines}
+    template_line_id: dict[str, int] = {}
     variables_by_type: Counter[str] = Counter()
+    masked_chars_by_type: Counter[str] = Counter()
+    unmasked_tokens: Counter[str] = Counter()
     masked_chars = 0
     raw_chars = 0
     for line in lines:
         raw_chars += len(line.raw)
+        template_line_id.setdefault(line.template_hash, line.line_id)
         for variable in line.variables:
             variables_by_type[variable.type] += 1
-            masked_chars += variable.end - variable.start
+            span_length = variable.end - variable.start
+            masked_chars += span_length
+            masked_chars_by_type[variable.type] += span_length
+        for token in line.masked.split():
+            if token.startswith("<VAR:"):
+                continue
+            unmasked_tokens[token] += 1
     top_templates = [
         {
             "template_hash": template_hash,
@@ -35,12 +45,36 @@ def summarize_parsed(lines: list[ParsedLine]) -> dict[str, Any]:
         }
         for template_hash, count in template_counts.most_common(10)
     ]
+    mask_coverage_by_type = {
+        key: {
+            "count": variables_by_type[key],
+            "masked_chars": masked_chars_by_type[key],
+            "coverage": masked_chars_by_type[key] / raw_chars if raw_chars else 0.0,
+        }
+        for key in sorted(variables_by_type)
+    }
+    singleton_template_examples = [
+        {
+            "line_id": template_line_id[template_hash],
+            "template_hash": template_hash,
+            "template": template_text[template_hash],
+        }
+        for template_hash, count in sorted(template_counts.items(), key=lambda item: (template_line_id[item[0]], item[0]))
+        if count == 1
+    ][:10]
+    singleton_unmasked_tokens = sorted(token for token, count in unmasked_tokens.items() if count == 1)
     return {
         "line_count": len(lines),
         "unique_template_count": len(template_counts),
         "singleton_template_count": sum(1 for count in template_counts.values() if count == 1),
         "variables_by_type": dict(sorted(variables_by_type.items())),
         "mask_coverage": masked_chars / raw_chars if raw_chars else 0.0,
+        "mask_coverage_by_type": mask_coverage_by_type,
+        "unmasked_high_cardinality_token_rate": unmasked_high_cardinality_token_rate(lines),
+        "top_unmasked_high_cardinality_tokens": [
+            {"token": token, "count": unmasked_tokens[token]} for token in singleton_unmasked_tokens[:10]
+        ],
+        "singleton_template_examples": singleton_template_examples,
         "top_templates": top_templates,
         "template_entropy": _entropy(template_counts),
     }
@@ -105,4 +139,3 @@ def drift_report(old: list[ParsedLine], new: list[ParsedLine]) -> dict[str, Any]
         "unmasked_high_cardinality_token_rate_new": unmasked_high_cardinality_token_rate(new),
         "template_frequency_jsd": _jensen_shannon(_distribution(old), _distribution(new)),
     }
-

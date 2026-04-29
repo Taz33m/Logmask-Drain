@@ -16,6 +16,7 @@ logmask validate-masks masks.json --logs sample.txt --strict
 logmask mask logs.txt --masks masks.json --out masked.jsonl
 logmask parse logs.txt --masks masks.json --template-id-mode hash --out parsed.jsonl
 logmask report parsed.jsonl
+logmask perf-benchmark --lines 10000 --lines 100000
 ```
 
 No GPU, model download, API key, or network access is required.
@@ -32,6 +33,8 @@ No GPU, model download, API key, or network access is required.
 - `runtime_mask_sha256` for reproducible parsing metadata.
 - `simple_drain` fallback parser.
 - JSONL output, report, inspect, drift, diff, sample, and benchmark commands.
+- Synthetic performance benchmarks for `synthesize`, `mask`, `parse`, and
+  `report`.
 
 ## Toy Benchmark
 
@@ -45,6 +48,24 @@ variable-boundary failures:
 | bundle | 1.0 | 1.0 |
 
 Real-world accuracy requires evaluation on representative logs.
+
+## v0.2 Development Focus
+
+The current development line adds real-log hardening without introducing LLM
+synthesis:
+
+- GitHub Actions CI on Python 3.11, 3.12, and 3.13.
+- Fresh-wheel install smoke tests.
+- Realistic fixtures with mixed timestamp formats, UUIDs, request/session IDs,
+  paths, URLs, quoted strings, interleaved services, and static numeric values
+  that conservative mode should preserve.
+- Report fields for mask coverage by type, singleton template examples, and
+  unmasked high-cardinality tokens.
+- Synthetic throughput checks:
+
+```bash
+logmask perf-benchmark --lines 10000 --lines 100000 --out perf.json
+```
 
 ## Template IDs
 

@@ -1,0 +1,8 @@
+2024-01-15 10:30:45 INFO service=auth request_id=req-000001 user alice login from 10.0.0.15 status=200 version=2
+2024/01/15 10:31:01 WARN service=api session_id=sess-000002 GET https://example.internal/v1/items/42 trace=123e4567-e89b-12d3-a456-426614174000 took 125ms status=503
+Jan 15 10:32:02 ERROR worker pid=4321 port=443 path=/srv/app/releases/42/config.json msg="retry failed"
+ts=1705321845 INFO config request_id=req-000003 loaded C:\ProgramData\Logmask\42\settings.ini status=304 version=1.3
+2024-01-15 10:33:03 INFO notify request_id=req-000004 sent email to ops@example.com msg='delivery queued'
+2024-01-15 10:34:04 INFO edge session_id=sess-000005 accepted connection from 2001:0db8:85a3:0000:0000:8a2e:0370:7334 port=8443
+2024/01/15 10:35:05 WARN service=api request_id=req-000006 GET http://example.internal/health took 2s status=200
+Jan 15 10:36:06 ERROR worker pid=9876 port=8443 path=/var/log/app/error.log msg="disk pressure"

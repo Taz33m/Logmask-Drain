@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test-build-smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install test/build tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]" build twine
+
+      - name: Run tests
+        run: python -m pytest -q
+
+      - name: Build package
+        run: python -m build
+
+      - name: Check package metadata
+        run: python -m twine check dist/*
+
+      - name: Fresh wheel install smoke test
+        run: |
+          python -m venv /tmp/logmask-wheel-test
+          /tmp/logmask-wheel-test/bin/python -m pip install --upgrade pip
+          /tmp/logmask-wheel-test/bin/python -m pip install dist/logmask_drain-*.whl
+          /tmp/logmask-wheel-test/bin/logmask --help
+          /tmp/logmask-wheel-test/bin/logmask synthesize tests/fixtures/toy/sample.txt --backend rules --rule-mode conservative --out /tmp/masks.json
+          /tmp/logmask-wheel-test/bin/logmask validate-masks /tmp/masks.json --logs tests/fixtures/toy/sample.txt --strict
+          /tmp/logmask-wheel-test/bin/logmask parse tests/fixtures/toy/logs.txt --masks /tmp/masks.json --template-id-mode hash --out /tmp/parsed.jsonl
+          /tmp/logmask-wheel-test/bin/logmask report /tmp/parsed.jsonl
+          /tmp/logmask-wheel-test/bin/logmask benchmark --logs tests/fixtures/toy/logs.txt --ground-truth tests/fixtures/toy/templates.csv --methods drain,builtin,bundle --masks /tmp/masks.json

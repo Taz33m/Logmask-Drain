@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.2.0 (unreleased)
+
+Real-log validation and performance hardening.
+
+### Added
+
+- GitHub Actions CI for Python 3.11, 3.12, and 3.13.
+- Fresh-wheel install smoke test in CI.
+- Realistic fixtures covering mixed timestamp formats, UUIDs, request/session
+  IDs, paths, URLs, quoted strings, interleaved services, and conservative-mode
+  static numeric preservation.
+- `logmask perf-benchmark` for deterministic synthetic throughput checks.
+- Report fields for mask coverage by type, singleton template examples,
+  unmasked high-cardinality tokens, and high-cardinality token rate.
+- Conservative masks for slash datetimes, syslog-style datetimes, and
+  contextual epoch timestamp assignments.
+
+### Changed
+
+- Development package version is now `0.2.0`.
+
 ## v0.1.1
 
 Hardening release for deterministic, CPU-only mask-first log parsing.
