@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.3.0 (unreleased)
+## v0.3.0 - 2026-04-29
 
 Optional API LLM candidate-mask synthesis behind a hard safety boundary.
 
@@ -22,6 +22,16 @@ Optional API LLM candidate-mask synthesis behind a hard safety boundary.
 
 - Package version is now `0.3.0`.
 - Rules remain the default synthesis backend and still require no network.
+
+### Verified
+
+- `python -m pytest -q` passes with 33 tests and 1 skipped live API test.
+- `python -m build` produces sdist and wheel.
+- `twine check dist/logmask_drain-0.3.0*` passes.
+- Fresh wheel install without `api-llm` extra passes.
+- Rules backend remains network-free from a fresh wheel.
+- API backend without optional dependency fails cleanly with install guidance.
+- GitHub Actions CI passes on Python 3.11, 3.12, and 3.13.
 
 ## v0.2.0 - 2026-04-29
 
