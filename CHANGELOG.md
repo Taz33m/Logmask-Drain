@@ -16,10 +16,13 @@ Real-log validation and performance hardening.
   unmasked high-cardinality tokens, and high-cardinality token rate.
 - Conservative masks for slash datetimes, syslog-style datetimes, and
   contextual epoch timestamp assignments.
+- Product requirements and engineering review docs.
 
 ### Changed
 
 - Development package version is now `0.2.0`.
+- High-cardinality token reporting now ignores contextual placeholder tokens
+  such as `request_id=<VAR:REQUEST_ID>`.
 
 ## v0.1.1
 

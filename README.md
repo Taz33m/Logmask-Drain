@@ -67,6 +67,9 @@ synthesis:
 logmask perf-benchmark --lines 10000 --lines 100000 --out perf.json
 ```
 
+See [docs/PRD.md](docs/PRD.md) for the product direction and
+[docs/REVIEW.md](docs/REVIEW.md) for the current engineering review.
+
 ## Template IDs
 
 Sequential IDs are readable but order-dependent:

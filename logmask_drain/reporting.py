@@ -34,7 +34,7 @@ def summarize_parsed(lines: list[ParsedLine]) -> dict[str, Any]:
             masked_chars += span_length
             masked_chars_by_type[variable.type] += span_length
         for token in line.masked.split():
-            if token.startswith("<VAR:"):
+            if "<VAR:" in token:
                 continue
             unmasked_tokens[token] += 1
     top_templates = [
@@ -107,7 +107,7 @@ def unmasked_high_cardinality_token_rate(lines: list[ParsedLine]) -> float:
     total = 0
     for line in lines:
         for token in line.masked.split():
-            if token.startswith("<VAR:"):
+            if "<VAR:" in token:
                 continue
             counts[token] += 1
             total += 1

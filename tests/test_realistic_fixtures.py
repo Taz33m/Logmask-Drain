@@ -72,6 +72,8 @@ def test_realistic_cli_report_additive_fields(tmp_path):
     assert "top_unmasked_high_cardinality_tokens" in summary
     assert "singleton_template_examples" in summary
     assert "unmasked_high_cardinality_token_rate" in summary
+    high_cardinality_tokens = {item["token"] for item in summary["top_unmasked_high_cardinality_tokens"]}
+    assert all("<VAR:" not in token for token in high_cardinality_tokens)
 
 
 def test_perf_benchmark_cli_is_deterministic_and_reports_throughput(tmp_path):
