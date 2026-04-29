@@ -19,6 +19,7 @@ Real-log validation and performance hardening.
 - Conservative contextual path assignment mask.
 - Product requirements and engineering review docs.
 - Mask tuning guide with contextual-mask examples.
+- v0.2 release checklist with a local 10k-line throughput snapshot.
 - Report `recommendations` for deterministic tuning hints.
 
 ### Changed

@@ -65,6 +65,8 @@ auditable, no-GPU environments.
 - CI passes on Python 3.11, 3.12, and 3.13.
 - Realistic fixture tests pass and preserve conservative-mode invariants.
 - `logmask perf-benchmark --lines 10000` completes locally.
+- A v0.2 release checklist records test, build, wheel-smoke, and throughput
+  verification commands.
 - Report JSON contains additive fields needed for mask tuning.
 - No regression in toy benchmark behavior: raw Drain may group correctly while
   mask-first methods recover exact generic templates.

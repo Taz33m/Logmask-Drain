@@ -22,6 +22,8 @@ quality, throughput, and reproducibility.
   mask-tuning guide with contextual-mask examples.
 - Conservative rules now include a contextual `path=` mask so
   `path=/srv/app/...` preserves the `path=` prefix while masking the value.
+- The v0.2 release checklist records the required release gate and a local
+  10k-line throughput smoke snapshot.
 
 ### Watch Items
 
