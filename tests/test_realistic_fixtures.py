@@ -28,6 +28,7 @@ def test_conservative_masks_cover_realistic_values_without_broad_numbers_or_log_
     assert "<VAR:EMAIL>" in rendered
     assert "<VAR:PATH>" in rendered
     assert "<VAR:QUOTED_STRING>" in rendered
+    assert "path=<VAR:PATH>" in rendered
     assert "INFO" in rendered and "WARN" in rendered and "ERROR" in rendered
     assert "status=200" in rendered
     assert "version=2" in rendered
@@ -72,6 +73,8 @@ def test_realistic_cli_report_additive_fields(tmp_path):
     assert "top_unmasked_high_cardinality_tokens" in summary
     assert "singleton_template_examples" in summary
     assert "unmasked_high_cardinality_token_rate" in summary
+    assert "recommendations" in summary
+    assert summary["recommendations"]
     high_cardinality_tokens = {item["token"] for item in summary["top_unmasked_high_cardinality_tokens"]}
     assert all("<VAR:" not in token for token in high_cardinality_tokens)
 

@@ -16,7 +16,10 @@ Real-log validation and performance hardening.
   unmasked high-cardinality tokens, and high-cardinality token rate.
 - Conservative masks for slash datetimes, syslog-style datetimes, and
   contextual epoch timestamp assignments.
+- Conservative contextual path assignment mask.
 - Product requirements and engineering review docs.
+- Mask tuning guide with contextual-mask examples.
+- Report `recommendations` for deterministic tuning hints.
 
 ### Changed
 

@@ -44,6 +44,8 @@ auditable, no-GPU environments.
 - Reports must expose template cardinality, singleton templates, variable
   counts, mask coverage, mask coverage by type, and unmasked high-cardinality
   tokens.
+- Reports must include deterministic recommendations that turn report signals
+  into next tuning actions.
 - Conservative rules must not mask broad numbers, generic IDs, or log levels by
   default.
 - CI must run tests, build artifacts, validate metadata, and run a fresh-wheel
@@ -74,6 +76,7 @@ auditable, no-GPU environments.
 - Harden realistic fixtures and reporting.
 - Add deterministic performance checks.
 - Add lightweight documentation for mask tuning.
+- Add report-driven tuning recommendations.
 
 ### v0.3
 
@@ -88,4 +91,3 @@ auditable, no-GPU environments.
 - Add optional `drain3` adapter.
 - Explore local model backends only after validator and benchmark coverage are
   strong.
-

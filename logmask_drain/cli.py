@@ -107,6 +107,14 @@ def _print_summary(summary: dict) -> None:
         token_table.add_row(item["token"], str(item["count"]))
     console.print(token_table)
 
+    recommendation_table = Table(title="Recommendations")
+    recommendation_table.add_column("Severity")
+    recommendation_table.add_column("Code")
+    recommendation_table.add_column("Message")
+    for item in summary["recommendations"]:
+        recommendation_table.add_row(item["severity"], item["code"], item["message"])
+    console.print(recommendation_table)
+
 
 @app.command()
 def synthesize(

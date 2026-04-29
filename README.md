@@ -68,7 +68,8 @@ logmask perf-benchmark --lines 10000 --lines 100000 --out perf.json
 ```
 
 See [docs/PRD.md](docs/PRD.md) for the product direction and
-[docs/REVIEW.md](docs/REVIEW.md) for the current engineering review.
+[docs/REVIEW.md](docs/REVIEW.md) for the current engineering review. For
+operational mask tuning, see [docs/MASK_TUNING.md](docs/MASK_TUNING.md).
 
 ## Template IDs
 

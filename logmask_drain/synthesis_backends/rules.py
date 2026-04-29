@@ -81,6 +81,15 @@ def conservative_masks() -> list[MaskSpec]:
             priority=98,
         ),
         MaskSpec(
+            name="path_assignment",
+            type="PATH",
+            pattern=r"\b(?:path|filepath|file)[=:]\s*([A-Za-z]:\\[^\s]+|/[^\s]+)",
+            value_group=1,
+            replacement="<VAR:PATH>",
+            priority=96,
+            flags=["IGNORECASE"],
+        ),
+        MaskSpec(
             name="windows_path",
             type="PATH",
             pattern=r"\b[A-Za-z]:\\(?:[^\\\s]+\\?)+",

@@ -18,6 +18,10 @@ quality, throughput, and reproducibility.
   not only tokens that start with placeholders. This prevents contextual tokens
   such as `request_id=<VAR:REQUEST_ID>` from being misclassified as unmasked
   text.
+- Reports now include deterministic recommendations and the repo includes a
+  mask-tuning guide with contextual-mask examples.
+- Conservative rules now include a contextual `path=` mask so
+  `path=/srv/app/...` preserves the `path=` prefix while masking the value.
 
 ### Watch Items
 
@@ -31,10 +35,6 @@ quality, throughput, and reproducibility.
 
 ## Recommended Next Work
 
-- Add mask-tuning documentation with before/after examples.
 - Add a small public-log fixture if licensing is clean.
-- Add report-driven recommendations, such as "consider contextual mask" for
-  recurring high-cardinality unmasked tokens.
 - Keep LLM synthesis out until real-log coverage and validator behavior are
   stronger.
-

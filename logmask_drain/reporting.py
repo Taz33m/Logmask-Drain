@@ -16,6 +16,82 @@ def _entropy(counter: Counter[str]) -> float:
     return -sum((count / total) * math.log2(count / total) for count in counter.values())
 
 
+def _recommendations(
+    *,
+    line_count: int,
+    singleton_template_count: int,
+    mask_coverage: float,
+    unmasked_high_cardinality_rate: float,
+    top_unmasked_high_cardinality_tokens: list[dict[str, Any]],
+    variables_by_type: Counter[str],
+) -> list[dict[str, str]]:
+    recommendations: list[dict[str, str]] = []
+
+    if line_count == 0:
+        return [
+            {
+                "severity": "info",
+                "code": "empty_input",
+                "message": "No parsed lines were provided; run parse before report.",
+            }
+        ]
+
+    if not variables_by_type:
+        recommendations.append(
+            {
+                "severity": "warning",
+                "code": "no_variables_extracted",
+                "message": "No variables were extracted; validate that the mask bundle matches this log source.",
+            }
+        )
+
+    if singleton_template_count:
+        recommendations.append(
+            {
+                "severity": "info",
+                "code": "inspect_singletons",
+                "message": "Inspect singleton template examples; repeated singleton shapes often indicate missing contextual masks.",
+            }
+        )
+
+    if unmasked_high_cardinality_rate >= 0.25 and top_unmasked_high_cardinality_tokens:
+        recommendations.append(
+            {
+                "severity": "info",
+                "code": "review_high_cardinality_tokens",
+                "message": "Review top unmasked high-cardinality tokens; mask true identifiers but preserve semantic constants such as status codes and versions.",
+            }
+        )
+
+    if mask_coverage < 0.05:
+        recommendations.append(
+            {
+                "severity": "info",
+                "code": "low_mask_coverage",
+                "message": "Mask coverage is low; this may be correct for static logs, but variable-heavy logs likely need more masks.",
+            }
+        )
+    elif mask_coverage > 0.75:
+        recommendations.append(
+            {
+                "severity": "warning",
+                "code": "high_mask_coverage",
+                "message": "Mask coverage is very high; check for over-broad masks that may erase useful template structure.",
+            }
+        )
+
+    if not recommendations:
+        recommendations.append(
+            {
+                "severity": "info",
+                "code": "no_obvious_tuning_actions",
+                "message": "No obvious report-level tuning actions were detected.",
+            }
+        )
+
+    return recommendations
+
+
 def summarize_parsed(lines: list[ParsedLine]) -> dict[str, Any]:
     template_counts = Counter(line.template_hash for line in lines)
     template_text = {line.template_hash: line.template for line in lines}
@@ -63,20 +139,31 @@ def summarize_parsed(lines: list[ParsedLine]) -> dict[str, Any]:
         if count == 1
     ][:10]
     singleton_unmasked_tokens = sorted(token for token, count in unmasked_tokens.items() if count == 1)
+    mask_coverage = masked_chars / raw_chars if raw_chars else 0.0
+    high_cardinality_rate = unmasked_high_cardinality_token_rate(lines)
+    top_unmasked_high_cardinality_tokens = [
+        {"token": token, "count": unmasked_tokens[token]} for token in singleton_unmasked_tokens[:10]
+    ]
     return {
         "line_count": len(lines),
         "unique_template_count": len(template_counts),
         "singleton_template_count": sum(1 for count in template_counts.values() if count == 1),
         "variables_by_type": dict(sorted(variables_by_type.items())),
-        "mask_coverage": masked_chars / raw_chars if raw_chars else 0.0,
+        "mask_coverage": mask_coverage,
         "mask_coverage_by_type": mask_coverage_by_type,
-        "unmasked_high_cardinality_token_rate": unmasked_high_cardinality_token_rate(lines),
-        "top_unmasked_high_cardinality_tokens": [
-            {"token": token, "count": unmasked_tokens[token]} for token in singleton_unmasked_tokens[:10]
-        ],
+        "unmasked_high_cardinality_token_rate": high_cardinality_rate,
+        "top_unmasked_high_cardinality_tokens": top_unmasked_high_cardinality_tokens,
         "singleton_template_examples": singleton_template_examples,
         "top_templates": top_templates,
         "template_entropy": _entropy(template_counts),
+        "recommendations": _recommendations(
+            line_count=len(lines),
+            singleton_template_count=sum(1 for count in template_counts.values() if count == 1),
+            mask_coverage=mask_coverage,
+            unmasked_high_cardinality_rate=high_cardinality_rate,
+            top_unmasked_high_cardinality_tokens=top_unmasked_high_cardinality_tokens,
+            variables_by_type=variables_by_type,
+        ),
     }
 
 
