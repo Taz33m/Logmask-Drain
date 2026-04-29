@@ -5,10 +5,10 @@ offline mask-bundle generation plus deterministic mask-first Drain-style parsing
 
 It is **not** a reproduction of the DeepParse paper's fine-tuned DeepSeek-R1
 checkpoint, LogHub-scale benchmark, or LogBERT downstream case study. The goal
-of v0.1 is a local, reproducible parser boundary: fixed masks in, deterministic
+is a local, reproducible parser boundary: fixed masks in, deterministic
 templates out.
 
-The v0.1 path is intentionally local and lightweight:
+The v0.2 path is intentionally local and lightweight:
 
 ```bash
 logmask synthesize sample.txt --backend rules --rule-mode conservative --out masks.json
@@ -21,7 +21,7 @@ logmask perf-benchmark --lines 10000 --lines 100000
 
 No GPU, model download, API key, or network access is required.
 
-## What v0.1 Includes
+## What v0.2 Includes
 
 - Rule-based conservative and aggressive mask synthesis.
 - Strict regex validation with timeout, empty-match, over-broadness, and
@@ -33,6 +33,13 @@ No GPU, model download, API key, or network access is required.
 - `runtime_mask_sha256` for reproducible parsing metadata.
 - `simple_drain` fallback parser.
 - JSONL output, report, inspect, drift, diff, sample, and benchmark commands.
+- GitHub Actions CI on Python 3.11, 3.12, and 3.13.
+- Fresh-wheel install smoke tests.
+- Realistic fixtures with mixed timestamp formats, UUIDs, request/session IDs,
+  paths, URLs, quoted strings, interleaved services, and static numeric values
+  that conservative mode should preserve.
+- Report fields for mask coverage by type, singleton template examples,
+  unmasked high-cardinality tokens, and deterministic recommendations.
 - Synthetic performance benchmarks for `synthesize`, `mask`, `parse`, and
   `report`.
 
@@ -49,19 +56,9 @@ variable-boundary failures:
 
 Real-world accuracy requires evaluation on representative logs.
 
-## v0.2 Development Focus
+## Throughput Checks
 
-The current development line adds real-log hardening without introducing LLM
-synthesis:
-
-- GitHub Actions CI on Python 3.11, 3.12, and 3.13.
-- Fresh-wheel install smoke tests.
-- Realistic fixtures with mixed timestamp formats, UUIDs, request/session IDs,
-  paths, URLs, quoted strings, interleaved services, and static numeric values
-  that conservative mode should preserve.
-- Report fields for mask coverage by type, singleton template examples, and
-  unmasked high-cardinality tokens.
-- Synthetic throughput checks:
+Run deterministic synthetic throughput checks with:
 
 ```bash
 logmask perf-benchmark --lines 10000 --lines 100000 --out perf.json

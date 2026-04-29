@@ -23,7 +23,7 @@ auditable, no-GPU environments.
 ## Current Product State
 
 - `v0.1.1` is released and tagged.
-- `main` is now on the `0.2.0` development line.
+- `v0.2.0` is the current release line.
 - The parser supports rule-based masks, strict validation, span-preserving
   masking, `simple_drain`, stable template hashes, hash-derived template IDs,
   reporting, drift, diffing, benchmarking, and synthetic performance checks.
@@ -75,10 +75,10 @@ auditable, no-GPU environments.
 
 ### v0.2
 
-- Harden realistic fixtures and reporting.
-- Add deterministic performance checks.
-- Add lightweight documentation for mask tuning.
-- Add report-driven tuning recommendations.
+- Harden realistic fixtures and reporting. Complete.
+- Add deterministic performance checks. Complete.
+- Add lightweight documentation for mask tuning. Complete.
+- Add report-driven tuning recommendations. Complete.
 
 ### v0.3
 

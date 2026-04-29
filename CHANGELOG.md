@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.2.0 (unreleased)
+## v0.2.0 - 2026-04-29
 
 Real-log validation and performance hardening.
 
@@ -24,9 +24,17 @@ Real-log validation and performance hardening.
 
 ### Changed
 
-- Development package version is now `0.2.0`.
+- Package version is now `0.2.0`.
 - High-cardinality token reporting now ignores contextual placeholder tokens
   such as `request_id=<VAR:REQUEST_ID>`.
+
+### Verified
+
+- `python -m pytest -q` passes with 24 tests.
+- `python -m build` produces sdist and wheel.
+- `twine check dist/*` passes.
+- Fresh Python 3.11 wheel install passes the CLI smoke checklist.
+- `logmask perf-benchmark --lines 10000` completes locally.
 
 ## v0.1.1
 
