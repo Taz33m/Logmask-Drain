@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.5.0 - 2026-04-30
+
+Optional real `drain3` parser adapter release.
+
+### Added
+
+- Optional `drain3` parser adapter behind `--engine drain3`.
+- Restored `drain3` package extra: `logmask-drain[drain3]`.
+- Drain3 parser metadata with `engine=drain3`, package version, and
+  `tokenizer_version=drain3_default_v1`.
+- Mocked adapter and CLI tests for drain3 behavior without requiring the
+  optional dependency in the default test environment.
+- CI fresh-wheel smoke coverage for installing `logmask-drain[drain3]` and
+  parsing a toy fixture with `--engine drain3`.
+
+### Changed
+
+- Package version is now `0.5.0`.
+- `simple_drain` remains the default parser engine.
+- The drain3 adapter receives Logmask-masked lines and disables Drain3-side
+  numeric parametrization so mask bundles stay the explicit runtime boundary.
+
+### Verified
+
+- `python -m pytest -q` passes with 57 tests and 1 skipped live API test.
+- `python -m build` produces sdist and wheel.
+- `twine check dist/logmask_drain-0.5.0*` passes.
+- Fresh Python 3.11 wheel install passes the CLI smoke checklist.
+- Fresh wheel install with `logmask-drain[drain3]` parses the toy fixture with
+  `--engine drain3`.
+
 ## v0.4.1 - 2026-04-30
 
 Privacy, UX, and consistency hardening release.

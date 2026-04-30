@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from importlib import metadata
+from typing import Any
 
 from .template_id import format_template_id, hash_template_id, normalize_template, template_hash
 
 
 TOKENIZER_VERSION = "whitespace_v1"
+DRAIN3_TOKENIZER_VERSION = "drain3_default_v1"
 SIMPLE_DRAIN_VERSION = "0.1"
 
 
@@ -116,9 +119,94 @@ class SimpleDrain:
         return assignments
 
 
-def get_parser(engine: str = "simple_drain", *, similarity_threshold: float = 0.4) -> SimpleDrain:
+@dataclass(frozen=True)
+class _Drain3Components:
+    template_miner: Any
+    template_miner_config: Any
+    version: str
+
+
+def _load_drain3_components() -> _Drain3Components:
+    try:
+        from drain3 import TemplateMiner
+        from drain3.template_miner_config import TemplateMinerConfig
+    except ImportError as exc:  # pragma: no cover - exercised through get_parser
+        raise ValueError(
+            "engine=drain3 requires the optional dependency; install with "
+            "`pip install 'logmask-drain[drain3]'`."
+        ) from exc
+
+    try:
+        version = metadata.version("drain3")
+    except metadata.PackageNotFoundError:
+        version = "unknown"
+    return _Drain3Components(
+        template_miner=TemplateMiner,
+        template_miner_config=TemplateMinerConfig,
+        version=version,
+    )
+
+
+class Drain3Adapter:
+    """Adapter for the optional drain3 implementation.
+
+    Logmask applies regex masks before this adapter sees a line. Drain3's own
+    numeric parametrization is disabled so mask bundles remain the explicit
+    runtime boundary.
+    """
+
+    engine = "drain3"
+    tokenizer_version = DRAIN3_TOKENIZER_VERSION
+
+    def __init__(self, *, similarity_threshold: float = 0.4):
+        self.similarity_threshold = similarity_threshold
+        self._components = _load_drain3_components()
+        self.engine_version = self._components.version
+
+    def _make_miner(self) -> Any:
+        config = self._components.template_miner_config()
+        if hasattr(config, "drain_sim_th"):
+            config.drain_sim_th = self.similarity_threshold
+        if hasattr(config, "profiling_enabled"):
+            config.profiling_enabled = False
+        if hasattr(config, "parametrize_numeric_tokens"):
+            config.parametrize_numeric_tokens = False
+        return self._components.template_miner(config=config)
+
+    def parse_all(self, lines: list[str], *, template_id_mode: str = "sequential") -> list[TemplateAssignment]:
+        if template_id_mode not in {"sequential", "hash"}:
+            raise ValueError("template_id_mode must be 'sequential' or 'hash'")
+
+        miner = self._make_miner()
+        cluster_to_index: dict[Any, int] = {}
+        assignments: list[TemplateAssignment] = []
+
+        for line in lines:
+            result = miner.add_log_message(line)
+            template = normalize_template(str(result.get("template_mined") or line))
+            hash_value = template_hash(template)
+
+            if template_id_mode == "hash":
+                template_id = hash_template_id(hash_value)
+            else:
+                cluster_key = result.get("cluster_id", template)
+                if cluster_key not in cluster_to_index:
+                    cluster_to_index[cluster_key] = len(cluster_to_index) + 1
+                template_id = format_template_id(cluster_to_index[cluster_key])
+
+            assignments.append(
+                TemplateAssignment(
+                    template_id=template_id,
+                    template_hash=hash_value,
+                    template=template,
+                )
+            )
+        return assignments
+
+
+def get_parser(engine: str = "simple_drain", *, similarity_threshold: float = 0.4) -> SimpleDrain | Drain3Adapter:
     if engine == "drain3":
-        raise ValueError("drain3 adapter is not implemented in this release; use engine=simple_drain")
+        return Drain3Adapter(similarity_threshold=similarity_threshold)
     if engine != "simple_drain":
-        raise ValueError("engine must be simple_drain")
+        raise ValueError("engine must be simple_drain or drain3")
     return SimpleDrain(similarity_threshold=similarity_threshold)

@@ -34,6 +34,7 @@ No GPU, model download, API key, or network access is required.
 - Stable `template_hash` and optional hash-derived `template_id`.
 - `runtime_mask_sha256` for reproducible parsing metadata.
 - `simple_drain` fallback parser.
+- Optional `drain3` parser adapter. `simple_drain` remains the default.
 - JSONL output, report, inspect, drift, diff, sample, and benchmark commands.
 - GitHub Actions CI on Python 3.11, 3.12, and 3.13.
 - Fresh-wheel install smoke tests.
@@ -96,6 +97,31 @@ logmask synthesize sample.txt \
 ```
 
 The default `rules` backend remains network-free.
+
+## Optional Drain3 Parser
+
+`simple_drain` is the default parser engine. To compare against the real
+`drain3` implementation, install the optional extra:
+
+```bash
+pip install "logmask-drain[drain3]"
+```
+
+Then parse with:
+
+```bash
+logmask parse logs.txt \
+  --masks masks.json \
+  --engine drain3 \
+  --template-id-mode hash \
+  --out parsed.drain3.jsonl
+```
+
+Logmask still applies the saved mask bundle before the parser sees any line.
+The `drain3` adapter disables Drain3-side numeric parametrization so runtime
+masks remain the explicit parsing boundary. Template strings and hashes may
+differ between `simple_drain` and `drain3`; parsed JSONL records
+`parser.engine` and `parser.engine_version` for auditability.
 
 ## Toy Benchmark
 

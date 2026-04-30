@@ -325,7 +325,7 @@ def parse(
             template_id_mode=template_id_mode,
             strict_runtime=strict_runtime,
         )
-    except RuntimeError as exc:
+    except (RuntimeError, ValueError) as exc:
         raise typer.BadParameter(str(exc)) from exc
     write_jsonl(out, rows)
     if diagnostics.runtime_timeout_count:
