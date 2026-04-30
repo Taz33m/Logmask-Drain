@@ -1,13 +1,12 @@
 <div align="center">
 
+<img src="assets/logo.png" alt="Logmask-Drain logo" width="230">
+
 # Logmask-Drain
 
-<img src="assets/logo.png" alt="Logmask-Drain logo" width="760">
+**CPU-first log parsing with validated regex mask bundles and deterministic Drain-style templates.**
 
-**Use the model once. Parse locally forever.**
-
-CPU-first log parsing with offline regex mask bundles, strict local validation,
-and deterministic Drain-style template extraction.
+> Use the model once. Parse locally forever.
 
 <p>
   <a href="https://github.com/Taz33m/Logmask-Drain/actions/workflows/ci.yml">
@@ -16,81 +15,66 @@ and deterministic Drain-style template extraction.
   <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white">
   <img alt="Version 0.7.0" src="https://img.shields.io/badge/version-0.7.0-blue">
   <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-green">
-  <img alt="CPU first" src="https://img.shields.io/badge/default-CPU--first-success">
-  <img alt="Network free default" src="https://img.shields.io/badge/default-network--free-success">
+  <img alt="CPU first" src="https://img.shields.io/badge/CPU--first-success">
+  <img alt="Network free default" src="https://img.shields.io/badge/network--free-default-success">
   <img alt="LLM optional" src="https://img.shields.io/badge/LLM-optional-7C3AED">
-  <img alt="CLI logmask" src="https://img.shields.io/badge/CLI-logmask-111827">
 </p>
 
 <p>
-  <a href="https://youtu.be/2YwAi0M_Jps"><b>Watch Demo</b></a>
+  <a href="https://youtu.be/2YwAi0M_Jps"><b>Watch the 90-second demo</b></a>
   ·
-  <a href="https://arxiv.org/abs/2604.20553"><b>DeepParse Paper</b></a>
+  <a href="https://arxiv.org/abs/2604.20553"><b>DeepParse paper</b></a>
   ·
-  <a href="docs/BENCHMARK_MATRIX.md"><b>Benchmark Matrix</b></a>
-  ·
-  <a href="docs/PRD.md"><b>PRD</b></a>
+  <a href="docs/BENCHMARK_MATRIX.md"><b>Benchmark matrix</b></a>
   ·
   <a href="docs/ROADMAP.md"><b>Roadmap</b></a>
 </p>
 
-<p>
-  <a href="https://youtu.be/2YwAi0M_Jps">Professional demo video on YouTube</a>
-</p>
-
 </div>
 
-## What It Is
+Logmask-Drain turns unstable values such as request IDs, IPs, paths, UUIDs,
+and timestamps into typed placeholders before Drain-style parsing. The same
+event becomes one stable template instead of many fragmented ones.
 
-Logmask-Drain is an architecture-first implementation of the core idea behind
-**DeepParse: Hybrid Log Parsing with LLM-Synthesized Regex Masks**
-([arXiv:2604.20553](https://arxiv.org/abs/2604.20553)):
+## 10-Second Example
 
-1. sample representative log lines,
-2. synthesize or load reusable regex masks offline,
-3. validate every mask locally,
-4. cache the accepted mask bundle,
-5. parse future logs deterministically with mask-first Drain-style execution.
+Raw logs:
 
-The default workflow is intentionally boring in the best way: no GPU, no model
-download, no API key, and no network access at runtime.
-
-## What It Is Not
-
-This repository is **not** the DeepParse authors' official artifact. It does
-not ship a fine-tuned DeepSeek-R1 checkpoint, reproduce the paper's full
-LogHub-scale benchmark, or include the LogBERT downstream anomaly-detection
-case study. Logmask-Drain focuses on the practical, auditable product boundary:
-
-> fixed masks in, deterministic templates out.
-
-## Why It Matters
-
-Raw log parsers often split one event into many templates because IDs, IPs,
-paths, hashes, request IDs, or timestamps look like structure. Per-line LLM
-parsing can recover intent, but it is expensive, non-deterministic, and awkward
-for private operational logs.
-
-Logmask-Drain takes the middle path:
-
-- use rules or an optional LLM once to propose masks,
-- reject unsafe or over-broad regexes before they can run,
-- preserve static context such as `request_id=`,
-- replace only values with typed placeholders,
-- parse locally forever from a saved bundle.
-
-## Installation
-
-From a local checkout:
-
-```bash
-python -m pip install -e ".[dev]"
+```text
+INFO user=alice request_id=abc123 ip=10.0.4.9 path=/api/v1/users status=200
+INFO user=bob   request_id=xyz789 ip=10.0.4.12 path=/api/v1/users status=200
 ```
+
+Mask-first parsing:
+
+```text
+INFO user=<VAR:USERNAME> request_id=<VAR:REQUEST_ID> ip=<VAR:IP> path=<VAR:PATH> status=200
+```
+
+Deterministic JSONL output:
+
+```json
+{
+  "template_hash": "sha1:...",
+  "template": "INFO user=<VAR:USERNAME> request_id=<VAR:REQUEST_ID> ip=<VAR:IP> path=<VAR:PATH> status=200"
+}
+```
+
+Default workflow: **no GPU, no model download, no API key, and no network
+access at runtime.**
+
+## Install
 
 From GitHub:
 
 ```bash
 python -m pip install "git+https://github.com/Taz33m/Logmask-Drain.git"
+```
+
+From a local checkout:
+
+```bash
+python -m pip install -e ".[dev]"
 ```
 
 Optional extras:
@@ -103,60 +87,66 @@ python -m pip install ".[yaml]"      # YAML mask-bundle loading
 
 ## Quickstart
 
-Create a conservative mask bundle from sample logs:
-
 ```bash
 logmask synthesize sample.txt \
   --backend rules \
   --rule-mode conservative \
   --out masks.json
-```
 
-Validate the bundle before it is trusted:
-
-```bash
 logmask validate-masks masks.json \
   --logs sample.txt \
   --strict
-```
-
-Mask and parse logs deterministically:
-
-```bash
-logmask mask logs.txt \
-  --masks masks.json \
-  --out masked.jsonl
 
 logmask parse logs.txt \
   --masks masks.json \
   --template-id-mode hash \
   --out parsed.jsonl
-```
 
-Inspect the result:
-
-```bash
 logmask report parsed.jsonl
-logmask inspect parsed.jsonl
 ```
 
-## Architecture
+Run `logmask --help` for the full CLI.
 
-```mermaid
-flowchart LR
-  A["Raw logs"] --> B["Sample<br/>entropy-greedy / random / longest"]
-  B --> C["Offline synthesis<br/>rules / API LLM / local llama.cpp"]
-  C --> D["Candidate masks"]
-  D --> E["Strict local validation<br/>syntax, timeouts, broadness, overlaps"]
-  E --> F["Saved mask bundle<br/>runtime_mask_sha256"]
-  F --> G["Mask-first execution<br/>typed placeholders + spans"]
-  G --> H["simple_drain or drain3"]
-  H --> I["Deterministic JSONL<br/>template_hash + parser metadata"]
-  I --> J["Reports, drift, benchmarks"]
+## Why It Exists
+
+Raw log parsers often split one event into many templates because values look
+like structure. Per-line LLM parsing can recover intent, but it is expensive,
+non-deterministic, and awkward for private operational logs.
+
+Logmask-Drain takes the middle path:
+
+- synthesize or load reusable masks offline,
+- validate every regex locally,
+- preserve static context such as `request_id=`,
+- replace only values with typed placeholders,
+- parse future logs locally from a saved bundle.
+
+## DeepParse Connection
+
+Logmask-Drain is an architecture-first implementation of the core idea behind
+**DeepParse: Hybrid Log Parsing with LLM-Synthesized Regex Masks**
+([arXiv:2604.20553](https://arxiv.org/abs/2604.20553)):
+
+```text
+raw logs -> sample representative lines -> synthesize/load candidate masks
+         -> validate locally -> save masks.json
+         -> mask-first parsing -> deterministic JSONL templates
 ```
 
 The LLM path never produces trusted runtime configuration directly. It produces
 candidate masks. The local validator decides what survives.
+
+## What It Is Not
+
+Logmask-Drain is not the DeepParse authors' official artifact. It does not:
+
+- ship the paper authors' fine-tuned DeepSeek-R1 checkpoint,
+- reproduce the full paper-scale benchmark,
+- include the LogBERT downstream anomaly-detection case study.
+
+It implements the practical product boundary:
+
+> fixed masks in, deterministic templates out.
 
 ## Mask Bundle Contract
 
@@ -178,10 +168,10 @@ machines.
 }
 ```
 
-With `value_group`, Logmask-Drain preserves the key and masks only the value:
+With `value_group`, Logmask-Drain keeps the key and masks only the value:
 
 ```text
-request_id=abc123  ->  request_id=<VAR:REQUEST_ID>
+request_id=abc123 -> request_id=<VAR:REQUEST_ID>
 ```
 
 ## Safety Boundary
@@ -202,9 +192,12 @@ semantically harmful for log parsing. This includes:
 Validation examples are redacted by default. Raw examples require explicit
 opt-in.
 
-## Optional API LLM Synthesis
+## Optional LLM Synthesis
 
-API synthesis is opt-in. The default rules backend remains network-free.
+Rules are the default and require no network. API and local LLM backends are
+optional candidate generators that still pass through the same local validator.
+
+API example:
 
 ```bash
 python -m pip install ".[api-llm]"
@@ -219,25 +212,7 @@ logmask synthesize sample.txt \
   --out masks.llm.json
 ```
 
-Oversized API samples are rejected by default to avoid accidentally sending a
-large production log file to a provider. Use `logmask sample` first, or pass
-`--allow-large-api-sample` only after reviewing the data.
-
-Hybrid mode is explicit:
-
-```bash
-logmask synthesize sample.txt \
-  --backend api-llm \
-  --provider openai \
-  --model gpt-4.1-mini \
-  --base-rules conservative \
-  --out masks.hybrid.json
-```
-
-## Optional Local LLM Synthesis
-
-Local synthesis uses an external `llama-cli` executable from llama.cpp. It is
-still candidate-only and still passes through strict local validation.
+Local llama.cpp example:
 
 ```bash
 logmask synthesize sample.txt \
@@ -248,6 +223,10 @@ logmask synthesize sample.txt \
   --candidate-report local-candidates.json \
   --out masks.local.json
 ```
+
+Oversized API samples are rejected by default so a production log file is not
+sent to a provider by accident. Use `logmask sample` first, or pass
+`--allow-large-api-sample` only after reviewing the data.
 
 ## Parser Engines
 
@@ -313,32 +292,9 @@ Logmask-Drain does not bundle LogHub data and does not make paper-scale
 accuracy claims. The benchmark layer exists to make parser/template behavior
 inspectable and reproducible.
 
-Reported metrics include:
-
-- `GA_exact`
-- `PA_generic`
-- nullable `PA_typed`
-- template count
-- singleton rate
-- parse runtime and total runtime
-- mask coverage
-- accepted and rejected mask counts
-
-## CLI Reference
-
-| Command | Purpose |
-| --- | --- |
-| `logmask sample` | Select representative lines for offline synthesis. |
-| `logmask synthesize` | Create mask bundles with rules, API LLM, or local LLM backends. |
-| `logmask validate-masks` | Validate a mask bundle against sample logs. |
-| `logmask mask` | Apply a bundle and emit masked JSONL with spans. |
-| `logmask parse` | Mask first, then parse with `simple_drain` or `drain3`. |
-| `logmask report` | Summarize templates, variables, coverage, and recommendations. |
-| `logmask inspect` | Inspect parsed JSONL interactively in the terminal. |
-| `logmask drift` | Compare parsed outputs for operational drift. |
-| `logmask diff-masks` | Compare mask bundles. |
-| `logmask benchmark-matrix` | Run structured reproducibility benchmarks. |
-| `logmask benchmark-loghub-matrix` | Run LogHub-style matrix benchmarks from structured CSV labels. |
+Reported metrics include `GA_exact`, `PA_generic`, nullable `PA_typed`,
+template count, singleton rate, runtime, mask coverage, and accepted/rejected
+mask counts.
 
 ## Documentation
 
