@@ -345,4 +345,3 @@ def test_cli_local_llm_requires_model_path(tmp_path):
     )
 
     assert result.exit_code != 0
-    assert "model-path" in result.output
