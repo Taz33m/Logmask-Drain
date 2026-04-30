@@ -34,13 +34,20 @@ from .pipeline import parse_lines, parse_lines_with_diagnostics
 from .regex_validation import VALIDATOR_VERSION, validate_masks as validate_mask_specs
 from .reporting import drift_report, summarize_parsed
 from .sampling import sample_lines
-from .prompts import API_LLM_MASKS_PROMPT_VERSION
+from .prompts import API_LLM_MASKS_PROMPT_VERSION, LOCAL_LLM_MASKS_PROMPT_VERSION
 from .synthesis_backends.api_llm import (
     DEFAULT_MAX_API_SAMPLE_CHARS,
     DEFAULT_MAX_API_SAMPLE_LINES,
     get_api_provider,
     synthesize_api_llm_bundle,
     validate_api_sample_limits,
+)
+from .synthesis_backends.local_llm import (
+    DEFAULT_MAX_LOCAL_SAMPLE_CHARS,
+    DEFAULT_MAX_LOCAL_SAMPLE_LINES,
+    get_local_provider,
+    synthesize_local_llm_bundle,
+    validate_local_sample_limits,
 )
 from .synthesis_backends.rules import get_rule_masks
 
@@ -128,14 +135,17 @@ def _print_summary(summary: dict) -> None:
 @app.command()
 def synthesize(
     sample: Path = typer.Argument(..., help="Plain-text sample log file."),
-    backend: str = typer.Option("rules", "--backend", help="rules or api-llm."),
+    backend: str = typer.Option("rules", "--backend", help="rules, api-llm, or local-llm."),
     rule_mode: str = typer.Option("conservative", "--rule-mode", help="conservative or aggressive."),
     provider: str = typer.Option("openai", "--provider", help="API LLM provider for --backend api-llm."),
     model: str = typer.Option("gpt-4.1-mini", "--model", help="API LLM model for --backend api-llm."),
+    local_provider: str = typer.Option("llama-cpp", "--local-provider", help="Local provider for --backend local-llm."),
+    model_path: Optional[Path] = typer.Option(None, "--model-path", help="Local model path for --backend local-llm."),
+    llama_cli: str = typer.Option("llama-cli", "--llama-cli", help="llama.cpp executable for --backend local-llm."),
     base_rules: str = typer.Option(
         "none",
         "--base-rules",
-        help="none, conservative, or aggressive base masks for --backend api-llm.",
+        help="none, conservative, or aggressive base masks for LLM backends.",
     ),
     candidate_report: Optional[Path] = typer.Option(
         None,
@@ -174,6 +184,28 @@ def synthesize(
         False,
         "--allow-large-api-sample",
         help="Allow API LLM synthesis to send samples larger than the default safety caps.",
+    ),
+    local_timeout_seconds: float = typer.Option(
+        120,
+        "--local-timeout-seconds",
+        help="Local LLM subprocess timeout for --backend local-llm.",
+    ),
+    ctx_size: int = typer.Option(4096, "--ctx-size", help="llama.cpp context size for --backend local-llm."),
+    max_tokens: int = typer.Option(2048, "--max-tokens", help="Maximum local LLM tokens to generate."),
+    max_local_sample_lines: int = typer.Option(
+        DEFAULT_MAX_LOCAL_SAMPLE_LINES,
+        "--max-local-sample-lines",
+        help="Maximum sample lines allowed for --backend local-llm.",
+    ),
+    max_local_sample_chars: int = typer.Option(
+        DEFAULT_MAX_LOCAL_SAMPLE_CHARS,
+        "--max-local-sample-chars",
+        help="Maximum sample characters allowed for --backend local-llm.",
+    ),
+    allow_large_local_sample: bool = typer.Option(
+        False,
+        "--allow-large-local-sample",
+        help="Allow local LLM synthesis to prompt with samples larger than the default caps.",
     ),
     out: Path = typer.Option(..., "--out", help="Output mask bundle JSON."),
     strict: bool = typer.Option(True, "--strict/--no-strict", help="Reject unsafe/useless masks."),
@@ -235,8 +267,56 @@ def synthesize(
             raise typer.BadParameter(str(exc)) from exc
         if candidate_report is not None:
             save_json(candidate_report, report)
+    elif backend == "local-llm":
+        if max_candidates <= 0:
+            raise typer.BadParameter("--max-candidates must be positive")
+        if model_path is None:
+            raise typer.BadParameter("--model-path is required for --backend local-llm")
+        if local_timeout_seconds <= 0:
+            raise typer.BadParameter("--local-timeout-seconds must be positive")
+        if ctx_size <= 0:
+            raise typer.BadParameter("--ctx-size must be positive")
+        if max_tokens <= 0:
+            raise typer.BadParameter("--max-tokens must be positive")
+        if max_local_sample_lines <= 0:
+            raise typer.BadParameter("--max-local-sample-lines must be positive")
+        if max_local_sample_chars <= 0:
+            raise typer.BadParameter("--max-local-sample-chars must be positive")
+        local_prompt_version = prompt_version
+        if local_prompt_version == API_LLM_MASKS_PROMPT_VERSION:
+            local_prompt_version = LOCAL_LLM_MASKS_PROMPT_VERSION
+        try:
+            validate_local_sample_limits(
+                lines,
+                max_local_sample_lines=max_local_sample_lines,
+                max_local_sample_chars=max_local_sample_chars,
+                allow_large_local_sample=allow_large_local_sample,
+            )
+            provider_instance = get_local_provider(local_provider, llama_cli=llama_cli)
+            bundle, report = synthesize_local_llm_bundle(
+                lines,
+                provider=provider_instance,
+                model_path=model_path,
+                prompt_version=local_prompt_version,
+                temperature=temperature,
+                max_candidates=max_candidates,
+                timeout_seconds=local_timeout_seconds,
+                ctx_size=ctx_size,
+                max_tokens=max_tokens,
+                max_local_sample_lines=max_local_sample_lines,
+                max_local_sample_chars=max_local_sample_chars,
+                allow_large_local_sample=allow_large_local_sample,
+                base_rules=base_rules,
+                strict=strict,
+                include_raw_examples=include_raw_examples,
+                allow_new_types=allow_new_types,
+            )
+        except (RuntimeError, ValueError) as exc:
+            raise typer.BadParameter(str(exc)) from exc
+        if candidate_report is not None:
+            save_json(candidate_report, report)
     else:
-        raise typer.BadParameter("--backend must be rules or api-llm")
+        raise typer.BadParameter("--backend must be rules, api-llm, or local-llm")
     save_mask_bundle(out, bundle)
     console.print(
         f"Wrote {out} with {len(bundle.masks)} accepted mask(s), "

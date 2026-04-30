@@ -26,6 +26,8 @@ No GPU, model download, API key, or network access is required.
 - Rule-based conservative and aggressive mask synthesis.
 - Optional API LLM candidate-mask synthesis behind strict local validation.
 - API LLM candidate reports, schema export, provider timeout, and retry knobs.
+- Optional local llama.cpp candidate-mask synthesis behind the same strict
+  validation boundary.
 - Strict regex validation with timeout, empty-match, over-broadness, and
   catastrophic-pattern checks.
 - Context-preserving `value_group` replacement.
@@ -97,6 +99,38 @@ logmask synthesize sample.txt \
 ```
 
 The default `rules` backend remains network-free.
+
+## Optional Local LLM Synthesis
+
+Local LLM synthesis is opt-in and uses an external `llama-cli` executable from
+llama.cpp. The local model proposes candidate masks only; candidates still pass
+the same local validation gate before they can enter a runtime bundle.
+
+```bash
+logmask synthesize sample.txt \
+  --backend local-llm \
+  --local-provider llama-cpp \
+  --llama-cli llama-cli \
+  --model-path ./models/mask-synth.gguf \
+  --max-local-sample-lines 200 \
+  --max-local-sample-chars 100000 \
+  --candidate-report local-candidates.json \
+  --out masks.local.json
+```
+
+Local synthesis refuses oversized prompts by default. Use `logmask sample`
+first, or pass `--allow-large-local-sample` explicitly when you have reviewed
+the prompt size.
+
+Hybrid local mode is explicit:
+
+```bash
+logmask synthesize sample.txt \
+  --backend local-llm \
+  --model-path ./models/mask-synth.gguf \
+  --base-rules conservative \
+  --out masks.local-hybrid.json
+```
 
 ## Optional Drain3 Parser
 

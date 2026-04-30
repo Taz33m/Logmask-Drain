@@ -1,5 +1,42 @@
 # Changelog
 
+## v0.6.0 - 2026-04-30
+
+Optional local llama.cpp candidate-mask synthesis release.
+
+### Added
+
+- `logmask synthesize --backend local-llm` for local candidate-mask synthesis.
+- `llama-cpp` local provider using an external `llama-cli` executable.
+- Local synthesis options: `--model-path`, `--llama-cli`,
+  `--local-provider`, `--local-timeout-seconds`, `--ctx-size`,
+  `--max-tokens`, `--max-local-sample-lines`, `--max-local-sample-chars`, and
+  `--allow-large-local-sample`.
+- `local_llm_masks_v1` prompt template for JSON-only candidate-mask output.
+- Local LLM JSON extraction that tolerates preamble, trailing text, and echoed
+  prompts by selecting the last valid candidate-mask object.
+- Local sample-size provenance in generated bundles and candidate reports.
+- Unit and CLI tests for mocked local providers, llama.cpp subprocess handling,
+  local prompt snapshots, oversized prompt guards, and JSON extraction.
+
+### Changed
+
+- Package version is now `0.6.0`.
+- Rules remain the default synthesis backend.
+- Local model output is candidate masks only; strict validation still decides
+  which masks enter the saved runtime bundle.
+
+### Verified
+
+- `python -m pytest -q` passes with 70 tests and 1 skipped live API test.
+- `python -m build` produces sdist and wheel.
+- `twine check dist/logmask_drain-0.6.0*` passes.
+- Fresh Python 3.11 wheel install passes the CLI smoke checklist.
+- Fresh wheel local-LLM smoke fails cleanly before provider work when
+  `--model-path` is missing.
+- Fresh wheel install with `logmask-drain[drain3]` still parses the toy fixture
+  with `--engine drain3`.
+
 ## v0.5.0 - 2026-04-30
 
 Optional real `drain3` parser adapter release.

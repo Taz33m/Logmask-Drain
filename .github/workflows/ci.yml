@@ -52,6 +52,8 @@ jobs:
           /tmp/logmask-wheel-test/bin/logmask benchmark --logs tests/fixtures/toy/logs.txt --ground-truth tests/fixtures/toy/templates.csv --methods drain,builtin,bundle --masks /tmp/masks.json
           /tmp/logmask-wheel-test/bin/logmask candidate-schema --out /tmp/candidate-schema.json
           /tmp/logmask-wheel-test/bin/logmask benchmark-loghub --structured tests/fixtures/loghub/structured.csv --methods drain,builtin,bundle --masks /tmp/masks.json --label-source "fixture labels" --out /tmp/loghub-benchmark.json
+          if /tmp/logmask-wheel-test/bin/logmask synthesize tests/fixtures/toy/sample.txt --backend local-llm --out /tmp/local-masks.json > /tmp/local-llm.out 2>&1; then exit 1; fi
+          grep -q "model-path" /tmp/local-llm.out
           WHEEL=$(ls dist/logmask_drain-*.whl)
           /tmp/logmask-wheel-test/bin/python -m pip install "${WHEEL}[drain3]"
           /tmp/logmask-wheel-test/bin/logmask parse tests/fixtures/toy/logs.txt --masks /tmp/masks.json --engine drain3 --template-id-mode hash --out /tmp/parsed-drain3.jsonl
