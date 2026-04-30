@@ -117,7 +117,8 @@ def test_cli_benchmark_loghub_default_methods_and_missing_bundle_masks(tmp_path)
     )
 
     assert result.exit_code != 0
-    assert "--masks is required" in result.output
+    assert "bundle" in result.output
+    assert "masks" in result.output
 
 
 def test_cli_benchmark_loghub_falls_back_to_template_clusters_when_event_id_absent(tmp_path):

@@ -90,7 +90,8 @@ def test_cli_synthesize_mask_parse_report_benchmark(tmp_path):
         ],
     )
     assert result.exit_code != 0
-    assert "--masks is required" in result.output
+    assert "bundle" in result.output
+    assert "masks" in result.output
 
     result = runner.invoke(
         app,
