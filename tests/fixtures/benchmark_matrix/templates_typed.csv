@@ -1,0 +1,5 @@
+line_id,template,typed_template
+0,<*> INFO request_id=<*> User <*> logged in from IP <*>,<VAR:DATETIME> INFO request_id=<VAR:REQUEST_ID> User <*> logged in from IP <VAR:IP>
+1,<*> INFO request_id=<*> User <*> logged in from IP <*>,<VAR:DATETIME> INFO request_id=<VAR:REQUEST_ID> User <*> logged in from IP <VAR:IP>
+2,<*> WARN pid=<*> port=<*> connection failed after <*>,<VAR:DATETIME> WARN pid=<VAR:PID> port=<VAR:PORT> connection failed after <VAR:DURATION>
+3,<*> WARN pid=<*> port=<*> connection failed after <*>,<VAR:DATETIME> WARN pid=<VAR:PID> port=<VAR:PORT> connection failed after <VAR:DURATION>

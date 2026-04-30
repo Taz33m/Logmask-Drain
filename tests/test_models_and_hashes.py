@@ -1,4 +1,7 @@
-from logmask_drain.io import runtime_mask_sha256
+import pytest
+
+from logmask_drain.io import load_mask_bundle, model_to_data, runtime_mask_sha256
+from logmask_drain.mask_bundle import create_mask_bundle
 from logmask_drain.models import MaskSpec, MaskValidation
 from logmask_drain.template_id import hash_template_id, template_hash
 
@@ -69,3 +72,19 @@ def test_hash_template_id_is_derived_from_template_hash():
     hash_value = template_hash("User <VAR:ID>")
     assert hash_template_id(hash_value).startswith("T")
     assert hash_template_id(hash_value) == hash_template_id(hash_value)
+
+
+def test_yaml_mask_bundle_loading_uses_optional_safe_loader(tmp_path):
+    yaml = pytest.importorskip("yaml")
+    bundle = create_mask_bundle(
+        [MaskSpec(name="ip", type="IP", pattern=r"10\.0\.0\.1", replacement="<VAR:IP>")],
+        ["from 10.0.0.1"],
+        backend="rules",
+    )
+    path = tmp_path / "masks.yaml"
+    path.write_text(yaml.safe_dump(model_to_data(bundle), sort_keys=True), encoding="utf-8")
+
+    loaded = load_mask_bundle(path)
+
+    assert loaded.masks[0].name == "ip"
+    assert loaded.masks[0].validation.examples[0].value is None

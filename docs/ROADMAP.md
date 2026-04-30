@@ -7,23 +7,15 @@ validation gate.
 
 ## Current Release Line
 
-### v0.6.x
+### v0.7.x
 
 - Keep rules as the default CPU-only, network-free synthesis path.
 - Harden optional API and local model candidate synthesis.
 - Keep saved mask bundles deterministic and auditable.
-- Refresh docs so they track the implemented architecture instead of older
-  release plans.
+- Use the benchmark matrix to compare fixed parsing configurations without
+  hidden live model calls.
 
 ## Next Releases
-
-### v0.7: Evaluation Credibility
-
-- Add PA_typed reporting when typed template ground truth is available.
-- Add variable-span F1 reporting when span ground truth is available.
-- Add richer benchmark fixtures with explicit label provenance.
-- Improve benchmark JSON schemas and caveats for public comparisons.
-- Keep LogHub-compatible evaluation opt-in and dataset-free.
 
 ### v0.8: Operational Resynthesis
 

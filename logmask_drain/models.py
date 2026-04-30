@@ -212,3 +212,56 @@ class ParsedLine(StrictModel):
     template: str
     parser: ParserMetadata
     variables: list[VariableSpan] = Field(default_factory=list)
+
+
+class BenchmarkDatasetMetadata(StrictModel):
+    format: str
+    source_path: str
+    line_count: int
+    label_source: str
+    content_column: str | None = None
+    template_column: str
+    cluster_column: str | None = None
+    typed_template_column: str | None = None
+
+
+class BenchmarkSampleMetadata(StrictModel):
+    sampler: str
+    sample_size: int
+    sample_sha256: str
+    seed: int = 0
+    sample_path: str | None = None
+
+
+class BenchmarkMethodResult(StrictModel):
+    method_id: str
+    status: Literal["passed", "failed", "skipped"]
+    error: str | None = None
+    parser_engine: str
+    synthesis_backend: str
+    mask_source: str | None = None
+    runtime_mask_sha256: str | None = None
+    live_synthesis: bool = False
+    GA_exact: float | None = None
+    PA_generic: float | None = None
+    PA_typed: float | None = None
+    template_count: int | None = None
+    singleton_count: int | None = None
+    singleton_rate: float | None = None
+    parse_runtime_seconds: float | None = None
+    runtime_seconds_total: float | None = None
+    runtime_per_100_logs_seconds: float | None = None
+    mask_coverage: float | None = None
+    accepted_mask_count: int | None = None
+    rejected_mask_count: int | None = None
+
+
+class BenchmarkRun(StrictModel):
+    schema_version: str = "0.1"
+    created_at: str
+    logmask_version: str
+    python_version: str
+    platform: str
+    dataset: BenchmarkDatasetMetadata
+    sample: BenchmarkSampleMetadata
+    methods: list[BenchmarkMethodResult] = Field(default_factory=list)

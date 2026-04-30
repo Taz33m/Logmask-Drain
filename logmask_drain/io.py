@@ -87,7 +87,19 @@ def write_lines(path: str | Path, lines: Iterable[str]) -> None:
 
 
 def load_json(path: str | Path) -> Any:
-    return json.loads(read_text(path))
+    path_object = Path(path)
+    text = read_text(path_object)
+    if path_object.suffix.lower() in {".yaml", ".yml"}:
+        try:
+            import yaml
+        except ImportError as exc:  # pragma: no cover - depends on optional extra.
+            raise RuntimeError(
+                "YAML mask-bundle loading requires the optional dependency: "
+                "pip install 'logmask-drain[yaml]'"
+            ) from exc
+        loaded = yaml.safe_load(text)
+        return {} if loaded is None else loaded
+    return json.loads(text)
 
 
 def save_json(path: str | Path, value: Any) -> None:
@@ -118,4 +130,3 @@ def load_parsed_jsonl(path: str | Path) -> list[ParsedLine]:
         if line.strip():
             rows.append(ParsedLine.model_validate_json(line))
     return rows
-

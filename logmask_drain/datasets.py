@@ -23,12 +23,25 @@ def load_ground_truth_templates(path: str | Path) -> list[str]:
 
 
 @dataclass(frozen=True)
+class GroundTruthDataset:
+    templates: list[str]
+    typed_templates: list[str] | None
+    clusters: list[str]
+    template_column: str
+    typed_template_column: str | None
+    cluster_column: str | None
+    label_source: str
+
+
+@dataclass(frozen=True)
 class LogHubStructuredDataset:
     logs: list[str]
     templates: list[str]
+    typed_templates: list[str] | None
     clusters: list[str]
     content_column: str
     template_column: str
+    typed_template_column: str | None
     cluster_column: str | None
     label_source: str
 
@@ -73,6 +86,7 @@ def load_loghub_structured_csv(
             fieldnames,
             ["EventTemplate", "event_template", "template", "Template"],
         )
+        typed_template_column = _first_present(fieldnames, ["TypedEventTemplate", "typed_template"])
         cluster_column = _first_present(fieldnames, ["EventId", "event_id", "eventid", "cluster", "Cluster"])
         if content_column is None:
             raise ValueError("LogHub structured CSV must contain a Content column")
@@ -82,13 +96,48 @@ def load_loghub_structured_csv(
         rows = _sort_structured_rows(list(reader), fieldnames)
         logs = [row[content_column] for row in rows]
         templates = [row[template_column] for row in rows]
+        typed_templates = [row[typed_template_column] for row in rows] if typed_template_column is not None else None
         clusters = [row[cluster_column] for row in rows] if cluster_column is not None else templates
         return LogHubStructuredDataset(
             logs=logs,
             templates=templates,
+            typed_templates=typed_templates,
             clusters=clusters,
             content_column=content_column,
             template_column=template_column,
+            typed_template_column=typed_template_column,
+            cluster_column=cluster_column,
+            label_source=label_source,
+        )
+
+
+def load_ground_truth_dataset(
+    path: str | Path,
+    *,
+    label_source: str = "ground_truth_csv",
+) -> GroundTruthDataset:
+    with Path(path).open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if reader.fieldnames is None:
+            raise ValueError("ground-truth CSV has no header")
+        fieldnames = list(reader.fieldnames)
+        template_column = _first_present(fieldnames, ["template", "event_template", "EventTemplate", "Template"])
+        typed_template_column = _first_present(fieldnames, ["typed_template", "TypedEventTemplate"])
+        cluster_column = _first_present(fieldnames, ["event_id", "EventId", "eventid", "cluster", "Cluster"])
+        if template_column is None:
+            raise ValueError("ground-truth CSV must contain a template or event_template column")
+        rows = list(reader)
+        if _first_present(fieldnames, ["line_id", "LineId", "lineid"]) is not None:
+            rows = _sort_structured_rows(rows, fieldnames)
+        templates = [row[template_column] for row in rows]
+        typed_templates = [row[typed_template_column] for row in rows] if typed_template_column is not None else None
+        clusters = [row[cluster_column] for row in rows] if cluster_column is not None else templates
+        return GroundTruthDataset(
+            templates=templates,
+            typed_templates=typed_templates,
+            clusters=clusters,
+            template_column=template_column,
+            typed_template_column=typed_template_column,
             cluster_column=cluster_column,
             label_source=label_source,
         )

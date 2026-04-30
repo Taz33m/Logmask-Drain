@@ -9,9 +9,17 @@ from typing import Optional
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
-from .datasets import load_ground_truth_templates, load_loghub_structured_csv
+from .benchmarking import (
+    DEFAULT_MATRIX_METHODS,
+    BundlePaths,
+    LiveSynthesisOptions,
+    parse_matrix_methods,
+    run_benchmark_matrix,
+)
+from .datasets import load_ground_truth_dataset, load_ground_truth_templates, load_loghub_structured_csv
 from .drain_adapter import get_parser
 from .io import (
     bundle_sha256,
@@ -28,7 +36,7 @@ from .io import (
 from .mask_bundle import create_mask_bundle
 from .masking import Masker
 from .metrics import grouping_accuracy_exact, normalize_generic_template, parsing_accuracy_generic
-from .models import BundleValidationSummary, CandidateMaskBundle, MaskBundle
+from .models import BenchmarkDatasetMetadata, BenchmarkRun, BundleValidationSummary, CandidateMaskBundle, MaskBundle
 from .performance import performance_benchmark
 from .pipeline import parse_lines, parse_lines_with_diagnostics
 from .regex_validation import VALIDATOR_VERSION, validate_masks as validate_mask_specs
@@ -130,6 +138,124 @@ def _print_summary(summary: dict) -> None:
     for item in summary["recommendations"]:
         recommendation_table.add_row(item["severity"], item["code"], item["message"])
     console.print(recommendation_table)
+
+
+def _print_benchmark_matrix(run: BenchmarkRun, *, title: str = "Benchmark Matrix") -> None:
+    table = Table(title=title)
+    for column in [
+        "method",
+        "status",
+        "GA_exact",
+        "PA_generic",
+        "PA_typed",
+        "templates",
+        "singleton_rate",
+        "parse_runtime",
+        "total_runtime",
+        "mask_coverage",
+        "accepted_masks",
+        "rejected_masks",
+    ]:
+        table.add_column(column)
+
+    def render(value: object) -> str:
+        if value is None:
+            return "-"
+        if isinstance(value, float):
+            return f"{value:.6f}"
+        return str(value)
+
+    for item in run.methods:
+        table.add_row(
+            item.method_id,
+            item.status,
+            render(item.GA_exact),
+            render(item.PA_generic),
+            render(item.PA_typed),
+            render(item.template_count),
+            render(item.singleton_rate),
+            render(item.parse_runtime_seconds),
+            render(item.runtime_seconds_total),
+            render(item.mask_coverage),
+            render(item.accepted_mask_count),
+            render(item.rejected_mask_count),
+        )
+    console.print(table)
+    skipped = [item for item in run.methods if item.status == "skipped"]
+    failed = [item for item in run.methods if item.status == "failed"]
+    for item in skipped + failed:
+        console.print(f"[yellow]{item.status}[/] {item.method_id}: {escape(item.error or '')}")
+
+
+def _matrix_paths(
+    *,
+    masks: Optional[Path],
+    api_llm_masks: Optional[Path],
+    local_llm_masks: Optional[Path],
+    hybrid_api_masks: Optional[Path],
+    hybrid_local_masks: Optional[Path],
+) -> BundlePaths:
+    return BundlePaths(
+        masks=masks,
+        api_llm_masks=api_llm_masks,
+        local_llm_masks=local_llm_masks,
+        hybrid_api_masks=hybrid_api_masks,
+        hybrid_local_masks=hybrid_local_masks,
+    )
+
+
+def _matrix_live_options(
+    *,
+    synthesize_missing: bool,
+    provider: str,
+    model: str,
+    local_provider: str,
+    model_path: Optional[Path],
+    llama_cli: str,
+    max_candidates: int,
+    temperature: float,
+    prompt_version: Optional[str],
+    provider_timeout_seconds: float,
+    provider_max_retries: int,
+    max_api_sample_lines: int,
+    max_api_sample_chars: int,
+    allow_large_api_sample: bool,
+    local_timeout_seconds: float,
+    ctx_size: int,
+    max_tokens: int,
+    max_local_sample_lines: int,
+    max_local_sample_chars: int,
+    allow_large_local_sample: bool,
+    allow_new_types: bool,
+) -> LiveSynthesisOptions:
+    return LiveSynthesisOptions(
+        synthesize_missing=synthesize_missing,
+        provider=provider,
+        model=model,
+        local_provider=local_provider,
+        model_path=model_path,
+        llama_cli=llama_cli,
+        max_candidates=max_candidates,
+        temperature=temperature,
+        prompt_version=prompt_version,
+        provider_timeout_seconds=provider_timeout_seconds,
+        provider_max_retries=provider_max_retries,
+        max_api_sample_lines=max_api_sample_lines,
+        max_api_sample_chars=max_api_sample_chars,
+        allow_large_api_sample=allow_large_api_sample,
+        local_timeout_seconds=local_timeout_seconds,
+        ctx_size=ctx_size,
+        max_tokens=max_tokens,
+        max_local_sample_lines=max_local_sample_lines,
+        max_local_sample_chars=max_local_sample_chars,
+        allow_large_local_sample=allow_large_local_sample,
+        allow_new_types=allow_new_types,
+    )
+
+
+def _exit_if_requested_for_skips(run: BenchmarkRun, *, fail_on_skip: bool) -> None:
+    if fail_on_skip and any(item.status == "skipped" for item in run.methods):
+        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -635,6 +761,227 @@ def benchmark_loghub(
         f"Labels: {dataset.label_source}; content={dataset.content_column}; "
         f"template={dataset.template_column}; cluster={dataset.cluster_column or dataset.template_column}"
     )
+
+
+@app.command("benchmark-matrix")
+def benchmark_matrix(
+    logs: Path = typer.Option(..., "--logs"),
+    ground_truth: Path = typer.Option(..., "--ground-truth"),
+    methods: str = typer.Option(DEFAULT_MATRIX_METHODS, "--methods"),
+    masks: Optional[Path] = typer.Option(None, "--masks", help="Saved mask bundle for bundle_* methods."),
+    api_llm_masks: Optional[Path] = typer.Option(None, "--api-llm-masks", help="Saved API LLM mask bundle."),
+    local_llm_masks: Optional[Path] = typer.Option(None, "--local-llm-masks", help="Saved local LLM mask bundle."),
+    hybrid_api_masks: Optional[Path] = typer.Option(None, "--hybrid-api-masks", help="Saved hybrid API mask bundle."),
+    hybrid_local_masks: Optional[Path] = typer.Option(None, "--hybrid-local-masks", help="Saved hybrid local mask bundle."),
+    sample_path: Optional[Path] = typer.Option(None, "--sample", help="Optional sample file for generated masks."),
+    sample_size: int = typer.Option(50, "--sample-size"),
+    sample_mode: str = typer.Option("entropy_greedy", "--sample-mode"),
+    sample_seed: int = typer.Option(0, "--sample-seed"),
+    rule_mode: str = typer.Option("conservative", "--rule-mode"),
+    similarity_threshold: float = typer.Option(0.4, "--similarity-threshold"),
+    template_id_mode: str = typer.Option("hash", "--template-id-mode"),
+    synthesize_missing: bool = typer.Option(False, "--synthesize-missing"),
+    fail_on_skip: bool = typer.Option(False, "--fail-on-skip"),
+    provider: str = typer.Option("openai", "--provider"),
+    model: str = typer.Option("gpt-4.1-mini", "--model"),
+    local_provider: str = typer.Option("llama-cpp", "--local-provider"),
+    model_path: Optional[Path] = typer.Option(None, "--model-path"),
+    llama_cli: str = typer.Option("llama-cli", "--llama-cli"),
+    max_candidates: int = typer.Option(32, "--max-candidates"),
+    temperature: float = typer.Option(0, "--temperature"),
+    prompt_version: Optional[str] = typer.Option(None, "--prompt-version"),
+    provider_timeout_seconds: float = typer.Option(60, "--provider-timeout-seconds"),
+    provider_max_retries: int = typer.Option(0, "--provider-max-retries"),
+    max_api_sample_lines: int = typer.Option(DEFAULT_MAX_API_SAMPLE_LINES, "--max-api-sample-lines"),
+    max_api_sample_chars: int = typer.Option(DEFAULT_MAX_API_SAMPLE_CHARS, "--max-api-sample-chars"),
+    allow_large_api_sample: bool = typer.Option(False, "--allow-large-api-sample"),
+    local_timeout_seconds: float = typer.Option(120, "--local-timeout-seconds"),
+    ctx_size: int = typer.Option(4096, "--ctx-size"),
+    max_tokens: int = typer.Option(2048, "--max-tokens"),
+    max_local_sample_lines: int = typer.Option(DEFAULT_MAX_LOCAL_SAMPLE_LINES, "--max-local-sample-lines"),
+    max_local_sample_chars: int = typer.Option(DEFAULT_MAX_LOCAL_SAMPLE_CHARS, "--max-local-sample-chars"),
+    allow_large_local_sample: bool = typer.Option(False, "--allow-large-local-sample"),
+    allow_new_types: bool = typer.Option(False, "--allow-new-types"),
+    label_source: str = typer.Option("ground_truth_csv", "--label-source"),
+    out: Optional[Path] = typer.Option(None, "--out"),
+) -> None:
+    raw_logs = read_lines(logs)
+    try:
+        truth = load_ground_truth_dataset(ground_truth, label_source=label_source)
+        parsed_methods = parse_matrix_methods(methods)
+        sample_override = read_lines(sample_path) if sample_path is not None else None
+        run = run_benchmark_matrix(
+            raw_logs,
+            truth.templates,
+            truth.clusters,
+            typed_truth_templates=truth.typed_templates,
+            dataset=BenchmarkDatasetMetadata(
+                format="plain_csv",
+                source_path=str(logs),
+                line_count=len(raw_logs),
+                label_source=truth.label_source,
+                template_column=truth.template_column,
+                cluster_column=truth.cluster_column,
+                typed_template_column=truth.typed_template_column,
+            ),
+            methods=parsed_methods,
+            paths=_matrix_paths(
+                masks=masks,
+                api_llm_masks=api_llm_masks,
+                local_llm_masks=local_llm_masks,
+                hybrid_api_masks=hybrid_api_masks,
+                hybrid_local_masks=hybrid_local_masks,
+            ),
+            rule_mode=rule_mode,
+            similarity_threshold=similarity_threshold,
+            template_id_mode=template_id_mode,
+            sample_size=sample_size,
+            sample_mode=sample_mode,
+            sample=sample_override,
+            sample_path=sample_path,
+            sample_seed=sample_seed,
+            live_options=_matrix_live_options(
+                synthesize_missing=synthesize_missing,
+                provider=provider,
+                model=model,
+                local_provider=local_provider,
+                model_path=model_path,
+                llama_cli=llama_cli,
+                max_candidates=max_candidates,
+                temperature=temperature,
+                prompt_version=prompt_version,
+                provider_timeout_seconds=provider_timeout_seconds,
+                provider_max_retries=provider_max_retries,
+                max_api_sample_lines=max_api_sample_lines,
+                max_api_sample_chars=max_api_sample_chars,
+                allow_large_api_sample=allow_large_api_sample,
+                local_timeout_seconds=local_timeout_seconds,
+                ctx_size=ctx_size,
+                max_tokens=max_tokens,
+                max_local_sample_lines=max_local_sample_lines,
+                max_local_sample_chars=max_local_sample_chars,
+                allow_large_local_sample=allow_large_local_sample,
+                allow_new_types=allow_new_types,
+            ),
+        )
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    if out is not None:
+        save_json(out, run)
+    _print_benchmark_matrix(run)
+    _exit_if_requested_for_skips(run, fail_on_skip=fail_on_skip)
+
+
+@app.command("benchmark-loghub-matrix")
+def benchmark_loghub_matrix(
+    structured: Path = typer.Option(..., "--structured", help="LogHub-style *_structured.csv with Content/EventTemplate."),
+    methods: str = typer.Option(DEFAULT_MATRIX_METHODS, "--methods"),
+    masks: Optional[Path] = typer.Option(None, "--masks", help="Saved mask bundle for bundle_* methods."),
+    api_llm_masks: Optional[Path] = typer.Option(None, "--api-llm-masks", help="Saved API LLM mask bundle."),
+    local_llm_masks: Optional[Path] = typer.Option(None, "--local-llm-masks", help="Saved local LLM mask bundle."),
+    hybrid_api_masks: Optional[Path] = typer.Option(None, "--hybrid-api-masks", help="Saved hybrid API mask bundle."),
+    hybrid_local_masks: Optional[Path] = typer.Option(None, "--hybrid-local-masks", help="Saved hybrid local mask bundle."),
+    sample_path: Optional[Path] = typer.Option(None, "--sample", help="Optional sample file for generated masks."),
+    sample_size: int = typer.Option(50, "--sample-size"),
+    sample_mode: str = typer.Option("entropy_greedy", "--sample-mode"),
+    sample_seed: int = typer.Option(0, "--sample-seed"),
+    rule_mode: str = typer.Option("conservative", "--rule-mode"),
+    similarity_threshold: float = typer.Option(0.4, "--similarity-threshold"),
+    template_id_mode: str = typer.Option("hash", "--template-id-mode"),
+    synthesize_missing: bool = typer.Option(False, "--synthesize-missing"),
+    fail_on_skip: bool = typer.Option(False, "--fail-on-skip"),
+    provider: str = typer.Option("openai", "--provider"),
+    model: str = typer.Option("gpt-4.1-mini", "--model"),
+    local_provider: str = typer.Option("llama-cpp", "--local-provider"),
+    model_path: Optional[Path] = typer.Option(None, "--model-path"),
+    llama_cli: str = typer.Option("llama-cli", "--llama-cli"),
+    max_candidates: int = typer.Option(32, "--max-candidates"),
+    temperature: float = typer.Option(0, "--temperature"),
+    prompt_version: Optional[str] = typer.Option(None, "--prompt-version"),
+    provider_timeout_seconds: float = typer.Option(60, "--provider-timeout-seconds"),
+    provider_max_retries: int = typer.Option(0, "--provider-max-retries"),
+    max_api_sample_lines: int = typer.Option(DEFAULT_MAX_API_SAMPLE_LINES, "--max-api-sample-lines"),
+    max_api_sample_chars: int = typer.Option(DEFAULT_MAX_API_SAMPLE_CHARS, "--max-api-sample-chars"),
+    allow_large_api_sample: bool = typer.Option(False, "--allow-large-api-sample"),
+    local_timeout_seconds: float = typer.Option(120, "--local-timeout-seconds"),
+    ctx_size: int = typer.Option(4096, "--ctx-size"),
+    max_tokens: int = typer.Option(2048, "--max-tokens"),
+    max_local_sample_lines: int = typer.Option(DEFAULT_MAX_LOCAL_SAMPLE_LINES, "--max-local-sample-lines"),
+    max_local_sample_chars: int = typer.Option(DEFAULT_MAX_LOCAL_SAMPLE_CHARS, "--max-local-sample-chars"),
+    allow_large_local_sample: bool = typer.Option(False, "--allow-large-local-sample"),
+    allow_new_types: bool = typer.Option(False, "--allow-new-types"),
+    label_source: str = typer.Option("structured_csv", "--label-source", help="Human-readable label provenance."),
+    out: Optional[Path] = typer.Option(None, "--out"),
+) -> None:
+    try:
+        dataset = load_loghub_structured_csv(structured, label_source=label_source)
+        parsed_methods = parse_matrix_methods(methods)
+        sample_override = read_lines(sample_path) if sample_path is not None else None
+        run = run_benchmark_matrix(
+            dataset.logs,
+            dataset.templates,
+            dataset.clusters,
+            typed_truth_templates=dataset.typed_templates,
+            dataset=BenchmarkDatasetMetadata(
+                format="loghub_structured_csv",
+                source_path=str(structured),
+                line_count=len(dataset.logs),
+                label_source=dataset.label_source,
+                content_column=dataset.content_column,
+                template_column=dataset.template_column,
+                cluster_column=dataset.cluster_column,
+                typed_template_column=dataset.typed_template_column,
+            ),
+            methods=parsed_methods,
+            paths=_matrix_paths(
+                masks=masks,
+                api_llm_masks=api_llm_masks,
+                local_llm_masks=local_llm_masks,
+                hybrid_api_masks=hybrid_api_masks,
+                hybrid_local_masks=hybrid_local_masks,
+            ),
+            rule_mode=rule_mode,
+            similarity_threshold=similarity_threshold,
+            template_id_mode=template_id_mode,
+            sample_size=sample_size,
+            sample_mode=sample_mode,
+            sample=sample_override,
+            sample_path=sample_path,
+            sample_seed=sample_seed,
+            live_options=_matrix_live_options(
+                synthesize_missing=synthesize_missing,
+                provider=provider,
+                model=model,
+                local_provider=local_provider,
+                model_path=model_path,
+                llama_cli=llama_cli,
+                max_candidates=max_candidates,
+                temperature=temperature,
+                prompt_version=prompt_version,
+                provider_timeout_seconds=provider_timeout_seconds,
+                provider_max_retries=provider_max_retries,
+                max_api_sample_lines=max_api_sample_lines,
+                max_api_sample_chars=max_api_sample_chars,
+                allow_large_api_sample=allow_large_api_sample,
+                local_timeout_seconds=local_timeout_seconds,
+                ctx_size=ctx_size,
+                max_tokens=max_tokens,
+                max_local_sample_lines=max_local_sample_lines,
+                max_local_sample_chars=max_local_sample_chars,
+                allow_large_local_sample=allow_large_local_sample,
+                allow_new_types=allow_new_types,
+            ),
+        )
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    if out is not None:
+        save_json(out, run)
+    _print_benchmark_matrix(run, title="LogHub-Compatible Benchmark Matrix")
+    console.print(
+        f"Labels: {dataset.label_source}; content={dataset.content_column}; "
+        f"template={dataset.template_column}; cluster={dataset.cluster_column or dataset.template_column}"
+    )
+    _exit_if_requested_for_skips(run, fail_on_skip=fail_on_skip)
 
 
 @app.command("perf-benchmark")

@@ -1,5 +1,52 @@
 # Changelog
 
+## v0.7.0 - 2026-04-30
+
+Reproducibility benchmark layer release.
+
+### Added
+
+- `logmask benchmark-matrix` for plain logs plus template CSV labels.
+- `logmask benchmark-loghub-matrix` for user-supplied LogHub/LogHub-2k-style
+  structured CSV files.
+- Versioned benchmark result schema with dataset, sample, environment, and
+  per-method parser/mask metadata.
+- Matrix methods for raw `simple_drain`, raw `drain3`, built-in masks, saved
+  bundles, saved API/local LLM bundles, and saved hybrid bundles.
+- `PA_typed` reporting when typed template labels are available.
+- Drain3 matrix methods skip cleanly with install guidance when the optional
+  dependency is absent.
+- `docs/BENCHMARK_MATRIX.md` with method IDs, result fields, metric meanings,
+  and live-synthesis caveats.
+- `SECURITY.md` with sensitive-artifact guidance, optional LLM boundary notes,
+  runtime regex timeout guidance, and vulnerability reporting instructions.
+- Repository logo asset for the public README.
+- Reproducible matrix fixtures and tests for typed labels, LogHub `EventId`
+  grouping, saved-bundle requirements, Drain3 skip behavior, and LLM provider
+  isolation.
+
+### Changed
+
+- Package version is now `0.7.0`.
+- LogHub benchmark docs now describe LogHub-2k-compatible matrix workflows.
+- API/local LLM benchmark methods use saved bundles by default; live synthesis
+  only runs with `--synthesize-missing` and is marked `live_synthesis=true`.
+- API and local LLM prompts now render sampled logs as JSON data and explicitly
+  instruct providers to treat log lines as inert data.
+- YAML mask-bundle loading now uses `yaml.safe_load` when the optional YAML
+  extra is installed.
+- Removed the unimplemented `re2` extra from public package metadata and
+  README installation docs.
+
+### Verified
+
+- `pytest -q` passes in a temporary Python 3.11 environment with 80 tests and
+  3 skipped optional/live tests.
+- `python -m build` in the Python 3.11 environment produces sdist and wheel.
+- `twine check dist/logmask_drain-0.7.0*` passes.
+- The source distribution includes README assets, `SECURITY.md`, docs, package
+  code, and benchmark fixtures.
+
 ## v0.6.1 - 2026-04-30
 
 Documentation and evaluation-metric hardening release.
