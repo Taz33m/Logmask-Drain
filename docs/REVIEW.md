@@ -6,9 +6,10 @@ The project has a solid deterministic core: fixed mask bundles, strict regex
 validation, span-preserving masking, stable template hashes, and CI-backed
 fresh-wheel smoke tests.
 
-The v0.3 product risk is API-generated regex quality. The mitigation is to keep
-LLM output as candidate JSON only: strict local validation remains the
-gatekeeper, and parsing still runs from saved deterministic mask bundles.
+The current product risk is optional model-generated regex quality. The
+mitigation is unchanged across API and local model backends: model output is
+candidate JSON only, strict local validation remains the gatekeeper, and parsing
+still runs from saved deterministic mask bundles.
 
 ## Findings
 
@@ -21,6 +22,19 @@ gatekeeper, and parsing still runs from saved deterministic mask bundles.
 - LLM candidates are rejected for unsafe regexes, broad full-line captures,
   log-level masks, unknown types unless explicitly allowed, duplicate runtime
   equivalents, and contextual key/value masks that fail to use `value_group`.
+
+### Fixed After v0.3
+
+- LogHub-compatible structured CSV benchmarking exists with explicit label
+  provenance and no bundled datasets.
+- The optional `drain3` adapter is implemented behind `--engine drain3`, while
+  `simple_drain` remains the default.
+- Local llama.cpp synthesis is implemented behind `--backend local-llm`; local
+  model output remains candidate-only and goes through the same validation gate.
+- The PRD and roadmap now reflect the v0.6 architecture instead of the older
+  v0.3 plan.
+- Initial typed-template accuracy and exact variable-span F1 helpers are
+  available for v0.7 evaluation work.
 
 ### Fixed in v0.2 Development
 
@@ -40,15 +54,20 @@ gatekeeper, and parsing still runs from saved deterministic mask bundles.
 - `simple_drain` is intentionally Drain-like, not a full Drain clone. Public
   docs should keep that distinction.
 - Conservative rules are safer than aggressive rules but will miss some useful
-  variables. This is preferable for v0.2 because over-masking damages template
+  variables. This remains preferable because over-masking damages template
   quality.
 - CI currently forces Node 24 for GitHub JavaScript actions because upstream
   actions still report Node 20 deprecation annotations.
-- The OpenAI provider is optional; environments without the `api-llm` extra
-  should still install, test, and run the default rules backend.
+- The OpenAI provider, local llama.cpp provider, and `drain3` parser are
+  optional; environments without optional extras/tools should still install,
+  test, and run the default rules backend.
+- LogHub-compatible support is a harness, not a benchmark claim. Public docs
+  should continue to avoid paper-scale accuracy claims.
 
 ## Recommended Next Work
 
-- Keep `drain3` integration separate from v0.3.
-- Keep LogHub-compatible evaluation separate from v0.3.
+- v0.7 should focus on evaluation credibility: PA_typed, span F1 integration,
+  richer fixtures, and clearer benchmark JSON contracts.
 - Add a small public-log fixture if licensing is clean.
+- Keep PyPI publishing gated behind the checklist in
+  `docs/PYPI_RELEASE_CHECKLIST.md`.

@@ -1,5 +1,38 @@
 # Changelog
 
+## v0.6.1 - 2026-04-30
+
+Documentation and evaluation-metric hardening release.
+
+### Added
+
+- `parsing_accuracy_typed` for exact typed-template matching.
+- `variable_span_f1` for exact variable span precision, recall, and F1 with
+  typed and untyped modes.
+- Opt-in live local LLM smoke test gated by
+  `LOGMASK_RUN_LIVE_LOCAL_LLM_TESTS=1`.
+- `docs/LOCAL_LLM.md` with llama.cpp workflow, prompt-size guards, failure
+  modes, and live-smoke instructions.
+- `docs/ROADMAP.md` with v0.7/v0.8/v1.0 release direction.
+- `docs/PYPI_RELEASE_CHECKLIST.md` for future PyPI readiness.
+
+### Changed
+
+- Package version is now `0.6.1`.
+- `docs/PRD.md` now reflects the actual v0.6 architecture and completed
+  roadmap items.
+- README now links to local LLM, roadmap, and PyPI-readiness docs.
+
+### Verified
+
+- `python -m pytest -q` passes with 73 tests and 2 skipped opt-in live tests.
+- `python -m build` produces sdist and wheel.
+- `twine check dist/logmask_drain-0.6.1*` passes.
+- Fresh Python 3.11 wheel install passes the CLI smoke checklist.
+- Fresh wheel benchmark smoke passes on the toy fixture.
+- Fresh wheel local-LLM smoke fails cleanly before provider work when
+  `--model-path` is missing.
+
 ## v0.6.0 - 2026-04-30
 
 Optional local llama.cpp candidate-mask synthesis release.

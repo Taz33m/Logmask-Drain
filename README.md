@@ -199,7 +199,10 @@ See [docs/PRD.md](docs/PRD.md) for the product direction and
 [docs/REVIEW.md](docs/REVIEW.md) for the current engineering review. For
 operational mask tuning, see [docs/MASK_TUNING.md](docs/MASK_TUNING.md). For
 LogHub-compatible evaluation, see
-[docs/LOGHUB_BENCHMARKS.md](docs/LOGHUB_BENCHMARKS.md).
+[docs/LOGHUB_BENCHMARKS.md](docs/LOGHUB_BENCHMARKS.md). For local model
+operations, see [docs/LOCAL_LLM.md](docs/LOCAL_LLM.md). For roadmap and release
+planning, see [docs/ROADMAP.md](docs/ROADMAP.md) and
+[docs/PYPI_RELEASE_CHECKLIST.md](docs/PYPI_RELEASE_CHECKLIST.md).
 
 ## Template IDs
 
