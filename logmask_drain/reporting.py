@@ -24,6 +24,7 @@ def _recommendations(
     unmasked_high_cardinality_rate: float,
     top_unmasked_high_cardinality_tokens: list[dict[str, Any]],
     variables_by_type: Counter[str],
+    runtime_timeout_count: int,
 ) -> list[dict[str, str]]:
     recommendations: list[dict[str, str]] = []
 
@@ -42,6 +43,15 @@ def _recommendations(
                 "severity": "warning",
                 "code": "no_variables_extracted",
                 "message": "No variables were extracted; validate that the mask bundle matches this log source.",
+            }
+        )
+
+    if runtime_timeout_count:
+        recommendations.append(
+            {
+                "severity": "warning",
+                "code": "runtime_regex_timeouts",
+                "message": "Runtime regex timeouts occurred during parsing; inspect masks and consider re-running parse with --strict-runtime.",
             }
         )
 
@@ -101,8 +111,13 @@ def summarize_parsed(lines: list[ParsedLine]) -> dict[str, Any]:
     unmasked_tokens: Counter[str] = Counter()
     masked_chars = 0
     raw_chars = 0
+    runtime_timeout_count = 0
+    runtime_timeouts_by_mask: dict[str, int] = {}
     for line in lines:
         raw_chars += len(line.raw)
+        if line.parser.runtime_timeout_count > runtime_timeout_count:
+            runtime_timeout_count = line.parser.runtime_timeout_count
+            runtime_timeouts_by_mask = dict(line.parser.runtime_timeouts_by_mask)
         template_line_id.setdefault(line.template_hash, line.line_id)
         for variable in line.variables:
             variables_by_type[variable.type] += 1
@@ -151,6 +166,8 @@ def summarize_parsed(lines: list[ParsedLine]) -> dict[str, Any]:
         "variables_by_type": dict(sorted(variables_by_type.items())),
         "mask_coverage": mask_coverage,
         "mask_coverage_by_type": mask_coverage_by_type,
+        "runtime_timeout_count": runtime_timeout_count,
+        "runtime_timeouts_by_mask": runtime_timeouts_by_mask,
         "unmasked_high_cardinality_token_rate": high_cardinality_rate,
         "top_unmasked_high_cardinality_tokens": top_unmasked_high_cardinality_tokens,
         "singleton_template_examples": singleton_template_examples,
@@ -163,6 +180,7 @@ def summarize_parsed(lines: list[ParsedLine]) -> dict[str, Any]:
             unmasked_high_cardinality_rate=high_cardinality_rate,
             top_unmasked_high_cardinality_tokens=top_unmasked_high_cardinality_tokens,
             variables_by_type=variables_by_type,
+            runtime_timeout_count=runtime_timeout_count,
         ),
     }
 

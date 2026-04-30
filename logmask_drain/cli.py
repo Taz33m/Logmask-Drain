@@ -30,12 +30,18 @@ from .masking import Masker
 from .metrics import grouping_accuracy_exact, normalize_generic_template, parsing_accuracy_generic
 from .models import BundleValidationSummary, CandidateMaskBundle, MaskBundle
 from .performance import performance_benchmark
-from .pipeline import parse_lines
+from .pipeline import parse_lines, parse_lines_with_diagnostics
 from .regex_validation import VALIDATOR_VERSION, validate_masks as validate_mask_specs
 from .reporting import drift_report, summarize_parsed
 from .sampling import sample_lines
 from .prompts import API_LLM_MASKS_PROMPT_VERSION
-from .synthesis_backends.api_llm import get_api_provider, synthesize_api_llm_bundle
+from .synthesis_backends.api_llm import (
+    DEFAULT_MAX_API_SAMPLE_CHARS,
+    DEFAULT_MAX_API_SAMPLE_LINES,
+    get_api_provider,
+    synthesize_api_llm_bundle,
+    validate_api_sample_limits,
+)
 from .synthesis_backends.rules import get_rule_masks
 
 
@@ -62,6 +68,7 @@ def _print_summary(summary: dict) -> None:
         "singleton_template_count",
         "template_entropy",
         "mask_coverage",
+        "runtime_timeout_count",
     ]:
         value = summary[key]
         if isinstance(value, float):
@@ -153,6 +160,21 @@ def synthesize(
         "--provider-max-retries",
         help="Provider request retry count for --backend api-llm.",
     ),
+    max_api_sample_lines: int = typer.Option(
+        DEFAULT_MAX_API_SAMPLE_LINES,
+        "--max-api-sample-lines",
+        help="Maximum sample lines allowed for --backend api-llm.",
+    ),
+    max_api_sample_chars: int = typer.Option(
+        DEFAULT_MAX_API_SAMPLE_CHARS,
+        "--max-api-sample-chars",
+        help="Maximum sample characters allowed for --backend api-llm.",
+    ),
+    allow_large_api_sample: bool = typer.Option(
+        False,
+        "--allow-large-api-sample",
+        help="Allow API LLM synthesis to send samples larger than the default safety caps.",
+    ),
     out: Path = typer.Option(..., "--out", help="Output mask bundle JSON."),
     strict: bool = typer.Option(True, "--strict/--no-strict", help="Reject unsafe/useless masks."),
     include_raw_examples: bool = typer.Option(
@@ -180,7 +202,17 @@ def synthesize(
             raise typer.BadParameter("--provider-timeout-seconds must be positive")
         if provider_max_retries < 0:
             raise typer.BadParameter("--provider-max-retries must be zero or positive")
+        if max_api_sample_lines <= 0:
+            raise typer.BadParameter("--max-api-sample-lines must be positive")
+        if max_api_sample_chars <= 0:
+            raise typer.BadParameter("--max-api-sample-chars must be positive")
         try:
+            validate_api_sample_limits(
+                lines,
+                max_api_sample_lines=max_api_sample_lines,
+                max_api_sample_chars=max_api_sample_chars,
+                allow_large_api_sample=allow_large_api_sample,
+            )
             api_provider = get_api_provider(provider)
             bundle, report = synthesize_api_llm_bundle(
                 lines,
@@ -191,6 +223,9 @@ def synthesize(
                 max_candidates=max_candidates,
                 provider_timeout_seconds=provider_timeout_seconds,
                 provider_max_retries=provider_max_retries,
+                max_api_sample_lines=max_api_sample_lines,
+                max_api_sample_chars=max_api_sample_chars,
+                allow_large_api_sample=allow_large_api_sample,
                 base_rules=base_rules,
                 strict=strict,
                 include_raw_examples=include_raw_examples,
@@ -272,18 +307,32 @@ def parse(
         "--template-id-mode",
         help="sequential or hash. Hash mode is stable across input order/shards.",
     ),
+    strict_runtime: bool = typer.Option(
+        False,
+        "--strict-runtime",
+        help="Fail if any runtime regex timeout occurs while masking.",
+    ),
 ) -> None:
     if template_id_mode not in {"sequential", "hash"}:
         raise typer.BadParameter("--template-id-mode must be sequential or hash")
     bundle = load_mask_bundle(masks)
-    rows = parse_lines(
-        read_lines(logs),
-        bundle,
-        engine=engine,
-        similarity_threshold=similarity_threshold,
-        template_id_mode=template_id_mode,
-    )
+    try:
+        rows, diagnostics = parse_lines_with_diagnostics(
+            read_lines(logs),
+            bundle,
+            engine=engine,
+            similarity_threshold=similarity_threshold,
+            template_id_mode=template_id_mode,
+            strict_runtime=strict_runtime,
+        )
+    except RuntimeError as exc:
+        raise typer.BadParameter(str(exc)) from exc
     write_jsonl(out, rows)
+    if diagnostics.runtime_timeout_count:
+        console.print(
+            "[yellow]Warning:[/] "
+            f"{diagnostics.timeout_summary()}. Re-run with --strict-runtime to fail on timeout."
+        )
     console.print(f"Wrote {len(rows)} parsed line(s) to {out}.")
 
 
@@ -368,7 +417,7 @@ def _templates_for_method(
 def benchmark(
     logs: Path = typer.Option(..., "--logs"),
     ground_truth: Path = typer.Option(..., "--ground-truth"),
-    methods: str = typer.Option("drain,builtin,bundle", "--methods"),
+    methods: str = typer.Option("drain,builtin", "--methods"),
     masks: Optional[Path] = typer.Option(None, "--masks"),
     rule_mode: str = typer.Option("conservative", "--rule-mode"),
     similarity_threshold: float = typer.Option(0.4, "--similarity-threshold"),
@@ -379,9 +428,13 @@ def benchmark(
     if len(raw_logs) != len(truth):
         raise typer.BadParameter("logs and ground truth contain different numbers of rows")
 
+    parsed_methods = _parse_methods(methods)
+    if "bundle" in parsed_methods and masks is None:
+        raise typer.BadParameter("--methods includes bundle, so --masks is required")
+
     truth_generic = [normalize_generic_template(item) for item in truth]
     results = []
-    for method in _parse_methods(methods):
+    for method in parsed_methods:
         predicted_templates, predicted_clusters, elapsed = _templates_for_method(
             method,
             raw_logs,
@@ -423,7 +476,7 @@ def benchmark(
 @app.command("benchmark-loghub")
 def benchmark_loghub(
     structured: Path = typer.Option(..., "--structured", help="LogHub-style *_structured.csv with Content/EventTemplate."),
-    methods: str = typer.Option("drain,builtin,bundle", "--methods"),
+    methods: str = typer.Option("drain,builtin", "--methods"),
     masks: Optional[Path] = typer.Option(None, "--masks"),
     rule_mode: str = typer.Option("conservative", "--rule-mode"),
     similarity_threshold: float = typer.Option(0.4, "--similarity-threshold"),
@@ -435,10 +488,14 @@ def benchmark_loghub(
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
 
+    parsed_methods = _parse_methods(methods)
+    if "bundle" in parsed_methods and masks is None:
+        raise typer.BadParameter("--methods includes bundle, so --masks is required")
+
     truth_generic = [normalize_generic_template(item) for item in dataset.templates]
     truth_clusters = dataset.clusters if dataset.cluster_column is not None else truth_generic
     results = []
-    for method in _parse_methods(methods):
+    for method in parsed_methods:
         predicted_templates, predicted_clusters, elapsed = _templates_for_method(
             method,
             dataset.logs,

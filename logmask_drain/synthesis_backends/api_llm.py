@@ -20,6 +20,45 @@ from ..regex_validation import VALIDATOR_VERSION, validate_masks
 from .rules import get_rule_masks
 
 
+DEFAULT_MAX_API_SAMPLE_LINES = 100
+DEFAULT_MAX_API_SAMPLE_CHARS = 50_000
+
+
+def api_sample_metadata(sample_lines: list[str], *, allow_large_api_sample: bool = False) -> dict[str, int | bool]:
+    sample_text = "\n".join(sample_lines)
+    return {
+        "line_count": len(sample_lines),
+        "char_count": len(sample_text),
+        "large_sample_override": allow_large_api_sample,
+    }
+
+
+def validate_api_sample_limits(
+    sample_lines: list[str],
+    *,
+    max_api_sample_lines: int = DEFAULT_MAX_API_SAMPLE_LINES,
+    max_api_sample_chars: int = DEFAULT_MAX_API_SAMPLE_CHARS,
+    allow_large_api_sample: bool = False,
+) -> dict[str, int | bool]:
+    if max_api_sample_lines <= 0:
+        raise ValueError("max_api_sample_lines must be positive")
+    if max_api_sample_chars <= 0:
+        raise ValueError("max_api_sample_chars must be positive")
+    metadata = api_sample_metadata(sample_lines, allow_large_api_sample=allow_large_api_sample)
+    if allow_large_api_sample:
+        return metadata
+    line_count = int(metadata["line_count"])
+    char_count = int(metadata["char_count"])
+    if line_count > max_api_sample_lines or char_count > max_api_sample_chars:
+        raise ValueError(
+            "API LLM synthesis would send "
+            f"{line_count:,} lines / {char_count:,} chars of logs. "
+            f"Limit is {max_api_sample_lines:,} lines / {max_api_sample_chars:,} chars. "
+            "Use logmask sample first, or pass --allow-large-api-sample explicitly."
+        )
+    return metadata
+
+
 class CandidateProvider(Protocol):
     provider_name: str
 
@@ -119,12 +158,21 @@ def synthesize_api_llm_bundle(
     max_candidates: int = 32,
     provider_timeout_seconds: float = 60,
     provider_max_retries: int = 0,
+    max_api_sample_lines: int = DEFAULT_MAX_API_SAMPLE_LINES,
+    max_api_sample_chars: int = DEFAULT_MAX_API_SAMPLE_CHARS,
+    allow_large_api_sample: bool = False,
     base_rules: str = "none",
     strict: bool = True,
     include_raw_examples: bool = False,
     allow_new_types: bool = False,
     sampler: str = "manual",
 ) -> tuple[MaskBundle, dict]:
+    api_sample = validate_api_sample_limits(
+        sample_lines,
+        max_api_sample_lines=max_api_sample_lines,
+        max_api_sample_chars=max_api_sample_chars,
+        allow_large_api_sample=allow_large_api_sample,
+    )
     base_accepted, base_rejected = validate_masks(
         _base_masks_for_mode(base_rules),
         sample_lines,
@@ -170,6 +218,7 @@ def synthesize_api_llm_bundle(
                 "max_candidates": max_candidates,
                 "provider_timeout_seconds": provider_timeout_seconds,
                 "provider_max_retries": provider_max_retries,
+                "api_sample": api_sample,
                 "schema_version": candidate_bundle.candidate_schema_version,
                 "allow_new_types": allow_new_types,
             },
@@ -193,6 +242,7 @@ def synthesize_api_llm_bundle(
         "base_rules": base_rules,
         "provider_timeout_seconds": provider_timeout_seconds,
         "provider_max_retries": provider_max_retries,
+        "api_sample": api_sample,
         "base_rule_accept_count": len(base_accepted),
         "base_rule_reject_count": len(base_rejected),
         "accepted_runtime_mask_count": len(accepted),

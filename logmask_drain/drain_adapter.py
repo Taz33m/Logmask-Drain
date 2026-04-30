@@ -117,10 +117,8 @@ class SimpleDrain:
 
 
 def get_parser(engine: str = "simple_drain", *, similarity_threshold: float = 0.4) -> SimpleDrain:
+    if engine == "drain3":
+        raise ValueError("drain3 adapter is not implemented in this release; use engine=simple_drain")
     if engine != "simple_drain":
-        try:
-            __import__("drain3")
-        except ImportError as exc:
-            raise ValueError("engine 'drain3' requested but optional dependency is not installed") from exc
-        raise ValueError("drain3 adapter is not implemented in v0.1; use simple_drain")
+        raise ValueError("engine must be simple_drain")
     return SimpleDrain(similarity_threshold=similarity_threshold)

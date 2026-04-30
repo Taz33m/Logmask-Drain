@@ -21,7 +21,7 @@ logmask perf-benchmark --lines 10000 --lines 100000
 
 No GPU, model download, API key, or network access is required.
 
-## What v0.3.x Includes
+## What the Current Release Includes
 
 - Rule-based conservative and aggressive mask synthesis.
 - Optional API LLM candidate-mask synthesis behind strict local validation.
@@ -68,9 +68,15 @@ logmask synthesize sample.txt \
   --model gpt-4.1-mini \
   --provider-timeout-seconds 60 \
   --provider-max-retries 1 \
+  --max-api-sample-lines 100 \
+  --max-api-sample-chars 50000 \
   --candidate-report candidates.json \
   --out masks.llm.json
 ```
+
+API synthesis refuses oversized samples by default. Use `logmask sample` first,
+or pass `--allow-large-api-sample` explicitly when you have reviewed what will
+be sent to the provider.
 
 Export the candidate-mask schema used for API LLM structured outputs:
 

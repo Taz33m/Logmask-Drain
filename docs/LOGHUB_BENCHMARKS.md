@@ -1,6 +1,6 @@
 # LogHub-Compatible Benchmarks
 
-Logmask-Drain v0.4.0 includes a LogHub-compatible benchmark harness for
+Logmask-Drain v0.4.x includes a LogHub-compatible benchmark harness for
 structured CSV files. It does not download datasets, bundle LogHub data, or make
 LogHub-scale accuracy claims.
 

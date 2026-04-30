@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 
 from .io import runtime_mask_sha256
@@ -47,6 +48,8 @@ class Masker:
         self.timeout_seconds = timeout_seconds
         self.runtime_hash = runtime_mask_sha256(self.masks)
         self._compiled = [(mask, compile_mask(mask)) for mask in self.masks]
+        self.timeout_count = 0
+        self.timeouts_by_mask: Counter[str] = Counter()
 
     def mask_line(self, line: str, line_id: int = 0) -> MaskedLine:
         candidates: list[CandidateSpan] = []
@@ -61,6 +64,8 @@ class Masker:
                         continue
                     candidates.append(CandidateSpan(start, end, mask, line[start:end]))
             except TimeoutError:
+                self.timeout_count += 1
+                self.timeouts_by_mask[mask.name] += 1
                 continue
 
         accepted = resolve_overlaps(candidates)
@@ -89,6 +94,11 @@ class Masker:
             runtime_mask_sha256=self.runtime_hash,
         )
 
+    def runtime_diagnostics(self) -> dict[str, object]:
+        return {
+            "runtime_timeout_count": self.timeout_count,
+            "runtime_timeouts_by_mask": dict(sorted(self.timeouts_by_mask.items())),
+        }
+
     def mask_lines(self, lines: list[str]) -> list[MaskedLine]:
         return [self.mask_line(line, index) for index, line in enumerate(lines)]
-

@@ -60,6 +60,38 @@ def test_cli_synthesize_mask_parse_report_benchmark(tmp_path):
     summary = load_json(report)
     assert summary["line_count"] == 4
 
+    default_benchmark = tmp_path / "default_benchmark.json"
+    result = runner.invoke(
+        app,
+        [
+            "benchmark",
+            "--logs",
+            str(raw),
+            "--ground-truth",
+            str(truth),
+            "--out",
+            str(default_benchmark),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    default_data = load_json(default_benchmark)
+    assert {item["method"] for item in default_data["results"]} == {"drain", "builtin"}
+
+    result = runner.invoke(
+        app,
+        [
+            "benchmark",
+            "--logs",
+            str(raw),
+            "--ground-truth",
+            str(truth),
+            "--methods",
+            "bundle",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "--masks is required" in result.output
+
     result = runner.invoke(
         app,
         [

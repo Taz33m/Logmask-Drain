@@ -50,8 +50,7 @@ def selected_span(match: regex.Match[str], value_group: int | None) -> tuple[int
 def _redacted_example(value: str, include_raw: bool) -> ValidationExample:
     if include_raw:
         return ValidationExample(value=value, length=len(value))
-    prefix = value[:3] + "..." if len(value) > 3 else value
-    return ValidationExample(sha256=sha256_text(value), length=len(value), preview=prefix)
+    return ValidationExample(sha256=sha256_text(value), length=len(value), preview=None)
 
 
 def _reject(mask: MaskSpec, reason: str, warnings: list[str] | None = None) -> ValidationResult:
@@ -70,6 +69,9 @@ def validate_mask(
     max_coverage_fraction: float = 0.80,
 ) -> ValidationResult:
     warnings: list[str] = []
+
+    if strict and mask.replacement != f"<VAR:{mask.type}>":
+        return _reject(mask, "replacement/type mismatch")
 
     if has_catastrophic_shape(mask.pattern):
         return _reject(mask, "known catastrophic regex shape")
@@ -193,4 +195,3 @@ def entropy(values: Counter[str]) -> float:
     if total == 0:
         return 0.0
     return -sum((count / total) * math.log2(count / total) for count in values.values())
-

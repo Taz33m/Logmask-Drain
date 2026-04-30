@@ -133,7 +133,7 @@ def test_api_llm_rejects_unknown_type_unless_allowed():
     assert accepted_bundle.masks[0].type == "CUSTOM_THING"
 
 
-def test_api_llm_duplicate_runtime_equivalent_against_base_rules_is_rejected():
+def test_api_llm_duplicate_match_equivalent_against_base_rules_is_rejected():
     provider = FakeProvider(
         CandidateMaskBundle(
             candidates=[
@@ -158,7 +158,7 @@ def test_api_llm_duplicate_runtime_equivalent_against_base_rules_is_rejected():
     assert any(mask.name == "ipv4" for mask in bundle.masks)
     candidate = report["candidates"][0]
     assert candidate["status"] == "rejected"
-    assert candidate["reason"] == "duplicate_runtime_equivalent"
+    assert candidate["reason"] == "duplicate_match_equivalent"
 
 
 def test_api_llm_hybrid_adds_only_accepted_llm_candidates_to_base_rules():
@@ -230,8 +230,63 @@ def test_api_llm_provider_timeout_retry_metadata_is_recorded():
     assert provider.calls[0]["max_retries"] == 2
     assert bundle.generator.params["provider_timeout_seconds"] == 12.5
     assert bundle.generator.params["provider_max_retries"] == 2
+    assert bundle.generator.params["api_sample"] == {
+        "line_count": 1,
+        "char_count": len("INFO completed"),
+        "large_sample_override": False,
+    }
     assert report["provider_timeout_seconds"] == 12.5
     assert report["provider_max_retries"] == 2
+    assert report["api_sample"]["line_count"] == 1
+
+
+def test_api_llm_rejects_large_sample_before_provider_call():
+    provider = FakeProvider(CandidateMaskBundle())
+
+    with pytest.raises(ValueError, match="Use logmask sample first"):
+        synthesize_api_llm_bundle(
+            ["line"] * 101,
+            provider=provider,
+            model="test-model",
+        )
+
+    assert provider.calls == []
+
+
+def test_api_llm_large_sample_override_records_provenance():
+    provider = FakeProvider(CandidateMaskBundle())
+
+    bundle, report = synthesize_api_llm_bundle(
+        ["line"] * 101,
+        provider=provider,
+        model="test-model",
+        allow_large_api_sample=True,
+    )
+
+    assert provider.calls
+    assert bundle.generator.params["api_sample"]["line_count"] == 101
+    assert bundle.generator.params["api_sample"]["large_sample_override"] is True
+    assert report["api_sample"]["large_sample_override"] is True
+
+
+def test_api_llm_known_types_match_aggressive_rule_types():
+    provider = FakeProvider(
+        CandidateMaskBundle(
+            candidates=[
+                CandidateMask(name="duration_float", type="FLOAT", pattern=r"\blatency=(\d+\.\d+)\b", value_group=1, replacement="<VAR:FLOAT>"),
+                CandidateMask(name="username", type="USERNAME", pattern=r"\buser\s+([A-Za-z_][A-Za-z0-9_.-]+)\b", value_group=1, replacement="<VAR:USERNAME>"),
+                CandidateMask(name="filename", type="FILENAME", pattern=r"\bfile=([\w.-]+\.log)\b", value_group=1, replacement="<VAR:FILENAME>"),
+            ]
+        )
+    )
+
+    bundle, _ = synthesize_api_llm_bundle(
+        ["latency=1.25 user alice file=app.log"],
+        provider=provider,
+        model="test-model",
+    )
+
+    assert {mask.type for mask in bundle.masks} == {"FLOAT", "USERNAME", "FILENAME"}
 
 
 def test_api_llm_rejects_adversarial_placeholder_key_and_duplicate_names():
@@ -343,6 +398,29 @@ def test_cli_api_llm_writes_bundle_and_candidate_report(monkeypatch, tmp_path):
     assert "examples_observed" not in data["candidates"][0]
     assert data["provider_timeout_seconds"] == 9
     assert data["provider_max_retries"] == 1
+    assert data["api_sample"]["line_count"] == 1
+
+
+def test_cli_api_llm_large_sample_fails_before_provider_lookup(monkeypatch, tmp_path):
+    called = False
+
+    def fail_if_called(provider_name: str) -> CandidateProvider:
+        nonlocal called
+        called = True
+        return FakeProvider(CandidateMaskBundle())
+
+    monkeypatch.setattr("logmask_drain.cli.get_api_provider", fail_if_called)
+    sample = tmp_path / "huge.log"
+    sample.write_text("\n".join(f"line {index}" for index in range(101)) + "\n", encoding="utf-8")
+
+    result = CliRunner().invoke(
+        app,
+        ["synthesize", str(sample), "--backend", "api-llm", "--out", str(tmp_path / "masks.json")],
+    )
+
+    assert result.exit_code != 0
+    assert "Use logmask sample first" in result.output
+    assert called is False
 
 
 def test_cli_api_llm_missing_optional_dependency_message(monkeypatch, tmp_path):

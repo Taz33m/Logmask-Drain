@@ -1,5 +1,7 @@
 from logmask_drain.masking import Masker
+from logmask_drain.mask_bundle import create_mask_bundle
 from logmask_drain.models import MaskSpec
+from logmask_drain.pipeline import parse_lines_with_diagnostics
 from logmask_drain.regex_validation import validate_mask
 from logmask_drain.synthesis_backends.rules import get_rule_masks
 
@@ -128,3 +130,44 @@ def test_missing_and_empty_value_group_rejected():
         replacement="<VAR:ID>",
     )
     assert validate_mask(empty_group, ["id="], strict=True).rejected is not None
+
+
+def test_runtime_regex_timeout_is_counted(monkeypatch):
+    class TimeoutPattern:
+        def finditer(self, line, timeout):
+            raise TimeoutError
+
+    monkeypatch.setattr("logmask_drain.masking.compile_mask", lambda mask: TimeoutPattern())
+    mask = MaskSpec(name="slow", type="ID", pattern=r".+", replacement="<VAR:ID>")
+    masker = Masker([mask])
+
+    masked = masker.mask_line("abc", 7)
+
+    assert masked.masked == "abc"
+    assert masker.runtime_diagnostics() == {
+        "runtime_timeout_count": 1,
+        "runtime_timeouts_by_mask": {"slow": 1},
+    }
+
+
+def test_parse_records_runtime_timeout_metadata_and_strict_runtime_fails(monkeypatch):
+    class TimeoutPattern:
+        def finditer(self, line, timeout):
+            raise TimeoutError
+
+    mask = MaskSpec(name="slow", type="ID", pattern=r".+", replacement="<VAR:ID>")
+    bundle = create_mask_bundle([mask], ["abc"], backend="rules", strict=False)
+    monkeypatch.setattr("logmask_drain.masking.compile_mask", lambda mask: TimeoutPattern())
+
+    parsed, diagnostics = parse_lines_with_diagnostics(["abc"], bundle)
+
+    assert diagnostics.runtime_timeout_count == 1
+    assert parsed[0].parser.runtime_timeout_count == 1
+    assert parsed[0].parser.runtime_timeouts_by_mask == {"slow": 1}
+
+    try:
+        parse_lines_with_diagnostics(["abc"], bundle, strict_runtime=True)
+    except RuntimeError as exc:
+        assert "runtime regex timeout" in str(exc)
+    else:
+        raise AssertionError("strict runtime should fail on timeout")

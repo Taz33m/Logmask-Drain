@@ -37,7 +37,10 @@ KNOWN_CANDIDATE_TYPES = {
     "PORT",
     "DURATION",
     "QUOTED_STRING",
+    "FLOAT",
     "NUMBER",
+    "USERNAME",
+    "FILENAME",
     "GENERIC_ID",
 }
 LOG_LEVEL_TYPES = {"LOG_LEVEL", "LEVEL", "SEVERITY"}
@@ -204,7 +207,7 @@ def validate_candidate_masks(
         if reason is None and mask.name in seen_names:
             reason = "duplicate_name"
         if reason is None and _runtime_signature(mask) in seen_signatures:
-            reason = "duplicate_runtime_equivalent"
+            reason = "duplicate_match_equivalent"
 
         if reason is None:
             validation = validate_mask(

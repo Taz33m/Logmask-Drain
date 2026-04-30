@@ -199,6 +199,8 @@ class ParserMetadata(StrictModel):
     tokenizer_version: str
     template_id_mode: str = "sequential"
     runtime_mask_sha256: str
+    runtime_timeout_count: int = 0
+    runtime_timeouts_by_mask: dict[str, int] = Field(default_factory=dict)
 
 
 class ParsedLine(StrictModel):

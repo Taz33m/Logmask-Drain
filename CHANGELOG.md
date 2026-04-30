@@ -1,5 +1,44 @@
 # Changelog
 
+## v0.4.1 - 2026-04-30
+
+Privacy, UX, and consistency hardening release.
+
+### Added
+
+- API LLM sample-size guards: `--max-api-sample-lines`,
+  `--max-api-sample-chars`, and explicit `--allow-large-api-sample` override.
+- API sample line/character counts in API LLM bundle provenance and candidate
+  reports.
+- Runtime regex timeout metadata in parser output and reports.
+- `--strict-runtime` for `logmask parse` to fail on runtime regex timeouts.
+- LogHub metric-semantics tests for `EventId`, `EventTemplate`, `Message`,
+  `LineId`, and no-`EventId` fallback behavior.
+
+### Changed
+
+- Package version is now `0.4.1`.
+- Redacted validation examples no longer include raw substring previews by
+  default.
+- `benchmark` and `benchmark-loghub` now default to `drain,builtin`; `bundle`
+  must be requested explicitly with `--masks`.
+- LLM duplicate-candidate rejection reason is now `duplicate_match_equivalent`.
+- Candidate type registry now includes `FLOAT`, `USERNAME`, and `FILENAME`.
+- Strict mask validation now rejects replacement/type mismatches such as
+  `type=IP` with `replacement=<VAR:ID>`.
+- Removed the advertised `drain3` optional extra until the adapter is actually
+  implemented.
+- Updated stale `drain3` error text and README release wording.
+
+### Verified
+
+- `python -m pytest -q` passes with 53 tests and 1 skipped live API test.
+- `python -m build` produces sdist and wheel.
+- `twine check dist/logmask_drain-0.4.1*` passes.
+- Fresh wheel install passes the CLI smoke checklist.
+- `logmask benchmark` defaults to `drain,builtin` from a fresh wheel.
+- API LLM oversized sample guard fails before provider/dependency work.
+
 ## v0.4.0 - 2026-04-29
 
 LogHub-compatible evaluation harness.
